@@ -575,7 +575,6 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 		case EV_FIRE_WEAPON:
 			FireWeapon( ent );
 			break;
-
 		case EV_USE_ITEM1:		// teleporter
 			// drop flags in CTF
 			item = NULL;
@@ -741,7 +740,7 @@ void SendPendingPredictableEvents( playerState_t *ps ) {
 		ps->externalEvent = extEvent;
 	}
 }
-
+ 
 /*
 ==============
 ClientThink
@@ -753,12 +752,15 @@ If "g_synchronousClients 1" is set, this will be called exactly
 once for each server frame, which makes for smooth demo recording.
 ==============
 */
+	
 void ClientThink_real( gentity_t *ent ) {
 	gclient_t	*client;
 	pmove_t		pm;
 	int			oldEventSequence;
 	int			msec;
 	usercmd_t	*ucmd;
+	
+	//pm.timer = 0;
 
 	client = ent->client;
 
@@ -913,7 +915,8 @@ void ClientThink_real( gentity_t *ent ) {
 	else {
 		pm.tracemask = MASK_PLAYERSOLID;
 	}
-	pm.trace = trap_Trace;
+	pm.trace = trap_PlayerTrace;
+	//pm.trace = trap_Trace;
 	pm.pointcontents = trap_PointContents;
 	pm.debugLevel = g_debugMove.integer;
 	pm.noFootsteps = ( g_dmflags.integer & DF_NO_FOOTSTEPS ) > 0;
@@ -922,6 +925,8 @@ void ClientThink_real( gentity_t *ent ) {
 	pm.pmove_msec = pmove_msec.integer;
 
 	VectorCopy( client->ps.origin, client->oldOrigin );
+
+	pm.ps->module = 2;
 
 #ifdef MISSIONPACK
 		if (level.intermissionQueued != 0 && g_singlePlayer.integer) {
@@ -945,12 +950,15 @@ void ClientThink_real( gentity_t *ent ) {
 	if ( ent->client->ps.eventSequence != oldEventSequence ) {
 		ent->eventTime = level.time;
 	}
+
 	if (g_smoothClients.integer) {
 		BG_PlayerStateToEntityStateExtraPolate( &ent->client->ps, &ent->s, ent->client->ps.commandTime, qtrue );
 	}
+
 	else {
 		BG_PlayerStateToEntityState( &ent->client->ps, &ent->s, qtrue );
 	}
+
 	SendPendingPredictableEvents( &ent->client->ps );
 
 	if ( !( ent->client->ps.eFlags & EF_FIRING ) ) {
@@ -958,8 +966,7 @@ void ClientThink_real( gentity_t *ent ) {
 	}
 
 	// use the snapped origin for linking so it matches client predicted versions
-	VectorCopy( ent->s.pos.trBase, ent->r.currentOrigin );
-
+	//VectorCopy( ent->s.pos.trBase, ent->r.currentOrigin );
 	VectorCopy (pm.mins, ent->r.mins);
 	VectorCopy (pm.maxs, ent->r.maxs);
 
@@ -968,6 +975,9 @@ void ClientThink_real( gentity_t *ent ) {
 
 	// execute client events
 	ClientEvents( ent, oldEventSequence );
+
+	//update and create weapon angles here
+
 
 	// link entity now, after any personal teleporters have been used
 	trap_LinkEntity (ent);
@@ -1012,9 +1022,10 @@ void ClientThink_real( gentity_t *ent ) {
 		}
 		return;
 	}
-
+	
 	// perform once-a-second actions
 	ClientTimerActions( ent, msec );
+ 
 }
 
 /*

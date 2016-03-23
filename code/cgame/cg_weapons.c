@@ -207,6 +207,43 @@ static void CG_NailgunEjectBrass( centity_t *cent ) {
 #endif
 
 
+
+void CG_DebugTrail (vec3_t start, vec3_t end, vec3_t offset) {
+	localEntity_t   *le;
+	refEntity_t     *re;
+
+	le = CG_AllocLocalEntity();
+	re = &le->refEntity;
+
+	le->leType = LE_FADE_RGB;
+	le->startTime = cg.time;
+	le->endTime = cg.time + cg_debugTrailTime.value;
+	le->lifeRate = 1.0 / ( le->endTime - le->startTime );
+
+	re->shaderTime = cg.time / 1000.0f;
+	re->reType = RT_RAIL_CORE;
+	re->customShader = cgs.media.railCoreShader;
+
+	VectorCopy( start, re->origin );
+	VectorCopy( end, re->oldorigin );
+
+	VectorAdd( re->origin, offset, re->origin );
+	VectorAdd( re->oldorigin, offset, re->oldorigin );
+
+	le->color[0] = 1;
+	le->color[1] = 0;
+	le->color[2] = 0;
+
+	le->color[3] = 1.0f;
+
+	AxisClear( re->axis );
+
+	//Com_Printf("s: %f %f %f ", start[0], start[1], start[2]);
+	//Com_Printf("e:   %f %f %f\n", end[0], end[1], end[2]);
+	//Com_Printf("e:   %f %f %f\n", offset[0], offset[1], offset[2]);
+}
+ 
+
 /*
 ==========================
 CG_RailTrail
@@ -220,7 +257,7 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end) {
 	localEntity_t *le;
 	refEntity_t   *re;
  
-#define RADIUS   4
+#define RADIUS   4 //distance from center rai
 #define ROTATION 1
 #define SPACING  5
  
@@ -797,6 +834,11 @@ void CG_RegisterWeapon( int weaponNum ) {
 		weaponInfo->flashSound[0] = trap_S_RegisterSound( "sound/weapons/plasma/hyprbf1a.wav", qfalse );
 		cgs.media.plasmaExplosionShader = trap_R_RegisterShader( "plasmaExplosion" );
 		cgs.media.railRingsShader = trap_R_RegisterShader( "railDisc" );
+		weaponInfo->missileDlight = 200;
+		weaponInfo->wiTrailTime = 2000;
+		weaponInfo->trailRadius = 64;
+		
+		MAKERGB( weaponInfo->missileDlightColor, 0.6f, 0.6f, 1.0f );
 		break;
 
 	case WP_RAILGUN:
@@ -815,6 +857,8 @@ void CG_RegisterWeapon( int weaponNum ) {
 		cgs.media.bfgExplosionShader = trap_R_RegisterShader( "bfgExplosion" );
 		weaponInfo->missileModel = trap_R_RegisterModel( "models/weaphits/bfg.md3" );
 		weaponInfo->missileSound = trap_S_RegisterSound( "sound/weapons/rocket/rockfly.wav", qfalse );
+		weaponInfo->missileDlight = 200;
+		MAKERGB( weaponInfo->missileDlightColor, 1, 0.7f, 1.0f );
 		break;
 
 	 default:
@@ -916,21 +960,35 @@ static void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
 	float	scale;
 	int		delta;
 	float	fracsin;
+	float	pitch;
 
 	VectorCopy( cg.refdef.vieworg, origin );
 	VectorCopy( cg.refdefViewAngles, angles );
 
-	// on odd legs, invert some angles
+	pitch = (cg.refdefViewAngles[0]);
+	if(pitch >0)
+		pitch *= .01;
+	else pitch *= .015;
+
+	pitch*=pitch;
+
+	pitch = fabs(pitch);
+	pitch +=1;
+
+	//Com_Printf("View: %f \n", pitch);
+
+	 //on odd legs, invert some angles
 	if ( cg.bobcycle & 1 ) {
 		scale = -cg.xyspeed;
 	} else {
 		scale = cg.xyspeed;
 	}
+	//Com_Printf("CG: %f \n", cg.xyspeed);
 
 	// gun angles from bobbing
-	angles[ROLL] += scale * cg.bobfracsin * 0.005;
-	angles[YAW] += scale * cg.bobfracsin * 0.01;
-	angles[PITCH] += cg.xyspeed * cg.bobfracsin * 0.005;
+	angles[ROLL] += scale * cg.bobfracsin  * 0.0000;
+	angles[YAW] += scale * cg.bobfracsin *pitch* 0.025;
+	angles[PITCH] += cg.xyspeed * cg.bobfracsin *pitch* 0.005;
 
 	// drop the weapon when landing
 	delta = cg.time - cg.landTime;
@@ -952,11 +1010,13 @@ static void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
 #endif
 
 	// idle drift
+	//MODIFY THIS SO THAT IT POINTS IN A MORE RANDOM DIRECTION
 	scale = cg.xyspeed + 40;
 	fracsin = sin( cg.time * 0.001 );
-	angles[ROLL] += scale * fracsin * 0.01;
-	angles[YAW] += scale * fracsin * 0.01;
-	angles[PITCH] += scale * fracsin * 0.01;
+
+	angles[ROLL] += scale * fracsin  *pitch* 0.0001;
+	angles[YAW] += scale * fracsin * pitch * 0.015;
+	angles[PITCH] += scale * fracsin * pitch * 0.03;
 }
 
 
@@ -1006,9 +1066,10 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 			}
 		}
 
-		AngleVectors(angle, forward, NULL, NULL );
+		//AngleVectors (ent->client->ps.weaponAngles, forward, right, up); //zcm
+		AngleVectors(cg.snap->ps.weaponAngles, forward, NULL, NULL );
 		VectorCopy(cent->lerpOrigin, muzzlePoint );
-//		VectorCopy(cg.refdef.vieworg, muzzlePoint );
+		//VectorCopy(cg.refdef.vieworg, muzzlePoint );
 	} else {
 		// !CPMA
 		AngleVectors( cent->lerpAngles, forward, NULL, NULL );
@@ -1022,6 +1083,8 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 
 	// project forward by the lightning range
 	VectorMA( muzzlePoint, LIGHTNING_RANGE, forward, endPoint );
+
+	endPoint[2] -= 10;
 
 	// see if it hit a wall
 	CG_Trace( &trace, muzzlePoint, vec3_origin, vec3_origin, endPoint, 
@@ -1227,7 +1290,6 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	weapon_t	weaponNum;
 	weaponInfo_t	*weapon;
 	centity_t	*nonPredictedCent;
-//	int	col;
 
 	weaponNum = cent->currentState.weapon;
 
@@ -1390,7 +1452,6 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 		return;
 	}
 
-
 	// allow the gun to be completely removed
 	if ( !cg_drawGun.integer ) {
 		vec3_t		origin;
@@ -1423,13 +1484,20 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	memset (&hand, 0, sizeof(hand));
 
 	// set up gun position
-	CG_CalculateWeaponPosition( hand.origin, angles );
+	//CG_CalculateWeaponPosition( hand.origin, angles );
 
-	VectorMA( hand.origin, cg_gun_x.value, cg.refdef.viewaxis[0], hand.origin );
-	VectorMA( hand.origin, cg_gun_y.value, cg.refdef.viewaxis[1], hand.origin );
-	VectorMA( hand.origin, (cg_gun_z.value+fovOffset), cg.refdef.viewaxis[2], hand.origin );
+	VectorCopy( cg.refdef.vieworg, hand.origin );
+	VectorCopy(cg.predictedPlayerState.weaponAngles,angles);
+
+	//Com_Printf("%f %f %f\n",angles[0],angles[1],angles[2]);
+
+	VectorMA( hand.origin, cg.predictedPlayerState.weaponOffset[0], cg.refdef.viewaxis[0], hand.origin );
+	VectorMA( hand.origin, -cg.predictedPlayerState.weaponOffset[1], cg.refdef.viewaxis[1], hand.origin );
+	VectorMA( hand.origin, cg.predictedPlayerState.weaponOffset[2], cg.refdef.viewaxis[2], hand.origin );
 
 	AnglesToAxis( angles, hand.axis );
+	
+	//VectorCopy(angles, cg.refdefWeaponAngles); //ZCM sen this over to game so we can use it to aim
 
 	// map torso animations to weapon animations
 	if ( cg_gun_frame.integer ) {
@@ -2199,7 +2267,7 @@ static qboolean	CG_CalcMuzzlePoint( int entityNum, vec3_t muzzle ) {
 
 	if ( entityNum == cg.snap->ps.clientNum ) {
 		VectorCopy( cg.snap->ps.origin, muzzle );
-		muzzle[2] += cg.snap->ps.viewheight;
+		muzzle[2] += cg.snap->ps.viewPos[1];
 		AngleVectors( cg.snap->ps.viewangles, forward, NULL, NULL );
 		VectorMA( muzzle, 14, forward, muzzle );
 		return qtrue;

@@ -24,8 +24,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // g_client.c -- client functions that don't happen every frame
 
-static vec3_t	playerMins = {-15, -15, -24};
-static vec3_t	playerMaxs = {15, 15, 32};
+static vec3_t	playerMins = {-15, -15, -28};
+static vec3_t	playerMaxs = {15, 15, 28};
 
 /*QUAKED info_player_deathmatch (1 0 1) (-16 -16 -24) (16 16 32) initial
 potential spawning position for deathmatch games.
@@ -480,15 +480,22 @@ SetClientViewAngle
 void SetClientViewAngle( gentity_t *ent, vec3_t angle ) {
 	int			i;
 
-	// set the delta angle
+
 	for (i=0 ; i<3 ; i++) {
 		int		cmdAngle;
 
 		cmdAngle = ANGLE2SHORT(angle[i]);
 		ent->client->ps.delta_angles[i] = cmdAngle - ent->client->pers.cmd.angles[i];
+	
 	}
 	VectorCopy( angle, ent->s.angles );
 	VectorCopy (ent->s.angles, ent->client->ps.viewangles);
+
+	ent->client->ps.weaponOffset[0] = 0;
+	ent->client->ps.weaponOffset[1] = 0;
+	ent->client->ps.weaponOffset[2] = -15; //zcm
+
+	VectorCopy ( ent->client->ps.viewangles, ent->client->ps.weaponAngles);
 }
 
 /*
@@ -496,7 +503,7 @@ void SetClientViewAngle( gentity_t *ent, vec3_t angle ) {
 respawn
 ================
 */
-void respawn( gentity_t *ent ) {
+void respawn( gentity_t *ent) {
 	gentity_t	*tent;
 
 	CopyToBodyQue (ent);
@@ -1216,6 +1223,8 @@ void ClientSpawn(gentity_t *ent) {
 	client->ps.pm_time = 100;
 
 	client->respawnTime = level.time;
+
+	
 	client->inactivityTime = level.time + g_inactivity.integer * 1000;
 	client->latched_buttons = 0;
 

@@ -121,9 +121,7 @@ static void CG_ClipMoveToEntities ( const vec3_t start, const vec3_t mins, const
 			VectorCopy( cent->lerpOrigin, origin );
 		}
 
-
-		trap_CM_TransformedBoxTrace ( &trace, start, end,
-			mins, maxs, cmodel,  mask, origin, angles);
+		trap_CM_TransformedBoxTrace ( &trace, start, end, mins, maxs, cmodel,  mask, origin, angles);
 
 		if (trace.allsolid || trace.fraction < tr->fraction) {
 			trace.entityNum = ent->number;
@@ -142,12 +140,39 @@ static void CG_ClipMoveToEntities ( const vec3_t start, const vec3_t mins, const
 CG_Trace
 ================
 */
+
+
+void	CG_PlayerTrace( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int skipNumber, int mask, vec3_t * body, const vec3_t origin, const vec3_t viewangles) {
+
+	trace_t	t;
+
+	//trap_CM_TransformedPlayerBoxTrace ( &t, start, end, mins, maxs, 0, mask, body, origin, viewangles);
+	trap_CM_BoxTrace ( &t, start, end, mins, maxs, 0, mask);
+	//trap_CM_TracePlayer( &t, start, end, mins, maxs, 0, mask, body);
+
+	t.entityNum = t.fraction != 1.0 ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
+
+	// check all other solid models
+	CG_ClipMoveToEntities (start, mins, maxs, end, skipNumber, mask, &t);
+
+	*result = t;
+}
+
+
+/*
+================
+CG_Trace
+================
+*/
 void	CG_Trace( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, 
 					 int skipNumber, int mask ) {
+
 	trace_t	t;
 
 	trap_CM_BoxTrace ( &t, start, end, mins, maxs, 0, mask);
+
 	t.entityNum = t.fraction != 1.0 ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
+
 	// check all other solid models
 	CG_ClipMoveToEntities (start, mins, maxs, end, skipNumber, mask, &t);
 
@@ -443,7 +468,8 @@ void CG_PredictPlayerState( void ) {
 
 	// prepare for pmove
 	cg_pmove.ps = &cg.predictedPlayerState;
-	cg_pmove.trace = CG_Trace;
+	//cg_pmove.trace = CG_Trace;
+	cg_pmove.trace = CG_PlayerTrace;
 	cg_pmove.pointcontents = CG_PointContents;
 	if ( cg_pmove.ps->pm_type == PM_DEAD ) {
 		cg_pmove.tracemask = MASK_PLAYERSOLID & ~CONTENTS_BODY;

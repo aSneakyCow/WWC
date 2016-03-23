@@ -1034,7 +1034,7 @@ int BotAI(int client, float thinktime) {
 	VectorCopy(bs->cur_ps.origin, bs->origin);
 	//eye coordinates of the bot
 	VectorCopy(bs->cur_ps.origin, bs->eye);
-	bs->eye[2] += bs->cur_ps.viewheight;
+	bs->eye[2] += bs->cur_ps.viewPos[1];
 	//get the area the bot is in
 	bs->areanum = BotPointAreaNum(bs->origin);
 	//the real AI

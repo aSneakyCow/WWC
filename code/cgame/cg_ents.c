@@ -42,10 +42,13 @@ void CG_PositionEntityOnTag( refEntity_t *entity, const refEntity_t *parent,
 	trap_R_LerpTag( &lerped, parentModel, parent->oldframe, parent->frame,
 		1.0 - parent->backlerp, tagName );
 
-	// FIXME: allow origin offsets along tag?
 	VectorCopy( parent->origin, entity->origin );
-	for ( i = 0 ; i < 3 ; i++ ) {
-		VectorMA( entity->origin, lerped.origin[i], parent->axis[i], entity->origin );
+	// FIXME: allow origin offsets along tag?
+	if(cg.renderingThirdPerson){
+		for ( i = 0 ; i < 3 ; i++ ) {
+			VectorMA( entity->origin, lerped.origin[i], parent->axis[i], entity->origin );
+		}
+	} else {
 	}
 
 	// had to cast away the const to avoid compiler problems...

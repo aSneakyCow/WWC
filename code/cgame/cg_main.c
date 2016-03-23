@@ -103,6 +103,11 @@ vmCvar_t	cg_drawTimer;
 vmCvar_t	cg_drawFPS;
 vmCvar_t	cg_drawSnapshot;
 vmCvar_t	cg_draw3dIcons;
+
+vmCvar_t	cg_drawPlayerBBox; //
+vmCvar_t	cg_PlayerLean; //ZCM
+vmCvar_t		cg_debugTrailTime;
+
 vmCvar_t	cg_drawIcons;
 vmCvar_t	cg_drawAmmoWarning;
 vmCvar_t	cg_drawCrosshair;
@@ -128,9 +133,12 @@ vmCvar_t	cg_brassTime;
 vmCvar_t	cg_viewsize;
 vmCvar_t	cg_drawGun;
 vmCvar_t	cg_gun_frame;
-vmCvar_t	cg_gun_x;
-vmCvar_t	cg_gun_y;
-vmCvar_t	cg_gun_z;
+vmCvar_t	gun_x; //zcm, also need to move this
+vmCvar_t	gun_y;
+vmCvar_t	gun_z;
+//vmCvar_t	cg_gun_x;
+//vmCvar_t	cg_gun_y;
+//vmCvar_t	cg_gun_z;
 vmCvar_t	cg_tracerChance;
 vmCvar_t	cg_tracerWidth;
 vmCvar_t	cg_tracerLength;
@@ -220,6 +228,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawFPS, "cg_drawFPS", "0", CVAR_ARCHIVE  },
 	{ &cg_drawSnapshot, "cg_drawSnapshot", "0", CVAR_ARCHIVE  },
 	{ &cg_draw3dIcons, "cg_draw3dIcons", "1", CVAR_ARCHIVE  },
+	{ &cg_PlayerLean, "cg_PlayerLean", "1", CVAR_ARCHIVE  }, //zcm
+	{ &cg_drawPlayerBBox, "cg_drawPlayerBBox", "1", CVAR_ARCHIVE  }, //zcm
 	{ &cg_drawIcons, "cg_drawIcons", "1", CVAR_ARCHIVE  },
 	{ &cg_drawAmmoWarning, "cg_drawAmmoWarning", "1", CVAR_ARCHIVE  },
 	{ &cg_drawAttacker, "cg_drawAttacker", "1", CVAR_ARCHIVE  },
@@ -235,9 +245,13 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_addMarks, "cg_marks", "1", CVAR_ARCHIVE },
 	{ &cg_lagometer, "cg_lagometer", "1", CVAR_ARCHIVE },
 	{ &cg_railTrailTime, "cg_railTrailTime", "400", CVAR_ARCHIVE  },
-	{ &cg_gun_x, "cg_gunX", "0", CVAR_CHEAT },
-	{ &cg_gun_y, "cg_gunY", "0", CVAR_CHEAT },
-	{ &cg_gun_z, "cg_gunZ", "0", CVAR_CHEAT },
+	{ &cg_debugTrailTime, "cg_debugTrailTime", "20", CVAR_ARCHIVE  },
+	//{ &cg_gun_x, "cg_gunX", "0", CVAR_CHEAT },
+	//{ &cg_gun_y, "cg_gunY", "0", CVAR_CHEAT },
+	//{ &cg_gun_z, "cg_gunZ", "0", CVAR_CHEAT },
+	{ &gun_x, "gunX", "-5", CVAR_CHEAT }, //zcm
+	{ &gun_y, "gunY", "-3", CVAR_CHEAT },
+	{ &gun_z, "gunZ", "-12", CVAR_CHEAT },
 	{ &cg_centertime, "cg_centertime", "3", CVAR_CHEAT },
 	{ &cg_runpitch, "cg_runpitch", "0.002", CVAR_ARCHIVE},
 	{ &cg_runroll, "cg_runroll", "0.005", CVAR_ARCHIVE },

@@ -208,7 +208,6 @@ void TossClientPersistantPowerups( gentity_t *ent ) {
 }
 #endif
 
-
 /*
 ==================
 LookAtKiller
@@ -438,13 +437,10 @@ player_die
 */
 void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath ) {
 	gentity_t	*ent;
-	int			anim;
-	int			contents;
-	int			killer;
-	int			i;
+	int			anim, contents, killer, i, hurt;
 	char		*killerName, *obit;
 
-	if ( self->client->ps.pm_type == PM_DEAD ) {
+	if (self->client->ps.pm_type == PM_DEAD) {
 		return;
 	}
 
@@ -988,7 +984,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	// always give half damage if hurting self
 	// calculated after knockback, so rocket jumping works
 	if ( targ == attacker) {
-		damage *= 0.5;
+		//damage *= 0.5;	//zcm explosives no longer do partial self damage
 	}
 
 	if ( damage < 1 ) {

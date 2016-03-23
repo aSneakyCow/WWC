@@ -29,7 +29,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 pmove_t		*pm;
 pml_t		pml;
-
 // movement parameters
 float	pm_stopspeed = 100.0f;
 float	pm_duckScale = 0.25f;
@@ -47,6 +46,9 @@ float	pm_flightfriction = 3.0f;
 float	pm_spectatorfriction = 5.0f;
 
 int		c_pmove = 0;
+
+
+vec3_t traceBody[8]; //zcm
 
 
 /*
@@ -256,6 +258,7 @@ static void PM_Accelerate( vec3_t wishdir, float wishspeed, float accel ) {
 	for (i=0 ; i<3 ; i++) {
 		pm->ps->velocity[i] += accelspeed*wishdir[i];	
 	}
+
 #else
 	// proper way (avoids strafe jump maxspeed bug), but feels bad
 	vec3_t		wishVelocity;
@@ -351,12 +354,71 @@ static void PM_SetMovementDir( void ) {
 }
 
 
+static void PM_JetpackMove( void ){
+
+	pm->ps->velocity[2] += 0;
+
+	PM_StepSlideMove( qfalse );
+
+}
+
+
+static void PM_SprintMove( void ){
+	//I could set up an enum that matches the direction of each point then sets them in a loop
+	int i;
+	int dir = 0; //used to specify which side of the planes are being operated on, FR,RL.
+	int dir2 = 0;
+	int dir3 = 0;
+	vec3_t forward, right, up;
+	vec3_t endPoint = {0,0,0};
+
+	//trace_t trace;
+
+	AngleVectors(pm->ps->viewangles, forward, right, up);
+	//AngleVectors(pm->ps->weaponAngles, forward, right, up);
+
+	//void		(*trace)( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask );
+	//pm->trace(&trace, pm->ps->origin, pm->mins, pm->maxs, endPoint, pm->ps->clientNum, pm->tracemask);
+	
+	//if(trace.fraction){
+		//Com_Printf("%f   ", trace.endpos[0]);
+		//Com_Printf("%f   ", trace.endpos[1]);
+		//Com_Printf("%f   ", trace.endpos[2]);
+		//Com_Printf("%f   ", trace.fraction);
+		//Com_Printf("\n");
+	//}
+
+	for(i = 0; i < TOTAL_COLLISION_POINTS; i++){
+		if( i & 1)		dir = 1; 
+		else			dir = -1;
+
+		if((i/2) & 1)	dir2 = 1;
+		else			dir2 = -1;
+
+		if(i>3)			dir3 = 1;
+		else			dir3 = -1;
+
+		VectorClear(pm->body.points[i]);
+
+		VectorMA( pm->body.points[i], dir *		BOX_GIRTH,	forward,	pm->body.points[i]);
+		VectorMA( pm->body.points[i], -dir2 *	BOX_GIRTH,	right,		pm->body.points[i]);
+		VectorMA( pm->body.points[i], dir3 *	BOX_HEIGHT,	up,			pm->body.points[i]);
+
+		VectorCopy( pm->body.points[i], traceBody[i]);
+		//Com_Printf( "sm %i: %f, %f, %f  ", i, pm->body.points[i][0], pm->body.points[i][1], pm->body.points[i][2] );
+		//Com_Printf( "\n" );
+	}
+	//Com_Printf( "\n" );
+}
+ 
 /*
 =============
 PM_CheckJump
 =============
 */
 static qboolean PM_CheckJump( void ) {
+	float leapMult = 1;
+
 	if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
 		return qfalse;		// don't allow jump until all buttons are up
 	}
@@ -378,8 +440,22 @@ static qboolean PM_CheckJump( void ) {
 	pm->ps->pm_flags |= PMF_JUMP_HELD;
 
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
-	pm->ps->velocity[2] = JUMP_VELOCITY;
-	PM_AddEvent( EV_JUMP );
+	leapMult = sin(DEG2RAD(-pm->ps->viewangles[0]));
+
+	if (leapMult < 0) leapMult = 0;
+	//zcm
+	//this needs to be modified so that you can jump higher if you are: 
+		//coming out of a crouch
+		//if you are moving the angle you need to leap at should be lowered until it hits 45
+
+	if(pm->ps->pm_flags & PMF_SPRINT){
+		pm->ps->velocity[2] = JUMP_VELOCITY + leapMult * MAX_LEAP_VELOCITY;
+		PM_AddEvent( EV_JUMP );
+	} else {
+		pm->ps->velocity[2] = RUN_HEIGHT;
+	}
+
+
 
 	if ( pm->cmd.forwardmove >= 0 ) {
 		PM_ForceLegsAnim( LEGS_JUMP );
@@ -624,6 +700,7 @@ static void PM_AirMove( void ) {
 	VectorNormalize (pml.forward);
 	VectorNormalize (pml.right);
 
+
 	for ( i = 0 ; i < 2 ; i++ ) {
 		wishvel[i] = pml.forward[i]*fmove + pml.right[i]*smove;
 	}
@@ -676,7 +753,7 @@ static void PM_GrappleMove( void ) {
 	if (vlen <= 100)
 		VectorScale(vel, 10 * vlen, vel);
 	else
-		VectorScale(vel, 800, vel);
+		VectorScale(vel, 3000, vel);
 
 	VectorCopy(vel, pm->ps->velocity);
 
@@ -848,7 +925,7 @@ static void PM_NoclipMove( void ) {
 	float		wishspeed;
 	float		scale;
 
-	pm->ps->viewheight = DEFAULT_VIEWHEIGHT;
+	pm->ps->viewPos[1] = DEFAULT_VIEWHEIGHT;
 
 	// friction
 
@@ -1002,22 +1079,6 @@ static void PM_CrashLand( void ) {
 
 /*
 =============
-PM_CheckStuck
-=============
-*/
-/*
-void PM_CheckStuck(void) {
-	trace_t trace;
-
-	pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, pm->ps->origin, pm->ps->clientNum, pm->tracemask);
-	if (trace.allsolid) {
-		//int shit = qtrue;
-	}
-}
-*/
-
-/*
-=============
 PM_CorrectAllSolid
 =============
 */
@@ -1037,13 +1098,16 @@ static int PM_CorrectAllSolid( trace_t *trace ) {
 				point[0] += (float) i;
 				point[1] += (float) j;
 				point[2] += (float) k;
-				pm->trace (trace, point, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+
+				pm->trace(trace, point, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask, traceBody, pm->ps->origin, pm->ps->viewangles);
+				//pm->trace(trace, point, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 				if ( !trace->allsolid ) {
 					point[0] = pm->ps->origin[0];
 					point[1] = pm->ps->origin[1];
 					point[2] = pm->ps->origin[2] - 0.25;
 
-					pm->trace (trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+					pm->trace(trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask, traceBody, pm->ps->origin, pm->ps->viewangles );
+					//pm->trace(trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 					pml.groundTrace = *trace;
 					return qtrue;
 				}
@@ -1081,7 +1145,8 @@ static void PM_GroundTraceMissed( void ) {
 		VectorCopy( pm->ps->origin, point );
 		point[2] -= 64;
 
-		pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+		pm->trace(&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask, traceBody, pm->ps->origin, pm->ps->viewangles);
+		//pm->trace(&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 		if ( trace.fraction == 1.0 ) {
 			if ( pm->cmd.forwardmove >= 0 ) {
 				PM_ForceLegsAnim( LEGS_JUMP );
@@ -1112,7 +1177,8 @@ static void PM_GroundTrace( void ) {
 	point[1] = pm->ps->origin[1];
 	point[2] = pm->ps->origin[2] - 0.25;
 
-	pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+	pm->trace(&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask, traceBody, pm->ps->origin, pm->ps->viewangles);
+	//pm->trace(&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 	pml.groundTrace = trace;
 
 	// do something corrective if the trace starts in a solid...
@@ -1123,6 +1189,7 @@ static void PM_GroundTrace( void ) {
 
 	// if the trace didn't hit anything, we are in free fall
 	if ( trace.fraction == 1.0 ) {
+		//Com_Printf("trace.fraction %f", trace.fraction);
 		PM_GroundTraceMissed();
 		pml.groundPlane = qfalse;
 		pml.walking = qfalse;
@@ -1220,7 +1287,7 @@ static void PM_SetWaterLevel( void ) {
 	cont = pm->pointcontents( point, pm->ps->clientNum );
 
 	if ( cont & MASK_WATER ) {
-		sample2 = pm->ps->viewheight - MINS_Z;
+		sample2 = pm->ps->viewPos[1] - MINS_Z;
 		sample1 = sample2 / 2;
 
 		pm->watertype = cont;
@@ -1243,7 +1310,7 @@ static void PM_SetWaterLevel( void ) {
 ==============
 PM_CheckDuck
 
-Sets mins, maxs, and pm->ps->viewheight
+Sets mins, maxs, and pm->ps->viewPos[1]
 ==============
 */
 static void PM_CheckDuck (void)
@@ -1261,11 +1328,12 @@ static void PM_CheckDuck (void)
 			VectorSet( pm->maxs, 15, 15, 16 );
 		}
 		pm->ps->pm_flags |= PMF_DUCKED;
-		pm->ps->viewheight = CROUCH_VIEWHEIGHT;
+		pm->ps->viewPos[1] = CROUCH_VIEWHEIGHT;
 		return;
 	}
 	pm->ps->pm_flags &= ~PMF_INVULEXPAND;
-
+	
+	//crouchsize ZCM
 	pm->mins[0] = -15;
 	pm->mins[1] = -15;
 
@@ -1277,7 +1345,7 @@ static void PM_CheckDuck (void)
 	if (pm->ps->pm_type == PM_DEAD)
 	{
 		pm->maxs[2] = -8;
-		pm->ps->viewheight = DEAD_VIEWHEIGHT;
+		pm->ps->viewPos[1] = DEAD_VIEWHEIGHT;
 		return;
 	}
 
@@ -1290,8 +1358,9 @@ static void PM_CheckDuck (void)
 		if (pm->ps->pm_flags & PMF_DUCKED)
 		{
 			// try to stand up
-			pm->maxs[2] = 32;
-			pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, pm->ps->origin, pm->ps->clientNum, pm->tracemask );
+			pm->maxs[2] = 28;
+			pm->trace(&trace, pm->ps->origin, pm->mins, pm->maxs, pm->ps->origin, pm->ps->clientNum, pm->tracemask, traceBody, pm->ps->origin, pm->ps->viewangles);
+			//pm->trace(&trace, pm->ps->origin, pm->mins, pm->maxs, pm->ps->origin, pm->ps->clientNum, pm->tracemask );
 			if (!trace.allsolid)
 				pm->ps->pm_flags &= ~PMF_DUCKED;
 		}
@@ -1299,13 +1368,13 @@ static void PM_CheckDuck (void)
 
 	if (pm->ps->pm_flags & PMF_DUCKED)
 	{
-		pm->maxs[2] = 16;
-		pm->ps->viewheight = CROUCH_VIEWHEIGHT;
+		pm->maxs[2] = 16; //is this correct? since minz doesnt change shouldnt this be 14?
+		pm->ps->viewPos[1] = CROUCH_VIEWHEIGHT;
 	}
 	else
 	{
-		pm->maxs[2] = 32;
-		pm->ps->viewheight = DEFAULT_VIEWHEIGHT;
+		pm->maxs[2] = 28;
+		pm->ps->viewPos[1] = DEFAULT_VIEWHEIGHT;
 	}
 }
 
@@ -1580,11 +1649,11 @@ static void PM_Weapon( void ) {
 	// check for weapon change
 	// can't change if weapon is firing, but can change
 	// again if lowering or raising
-	if ( pm->ps->weaponTime <= 0 || pm->ps->weaponstate != WEAPON_FIRING ) {
+	//if ( /*pm->ps->weaponTime <= 0 *//*|| pm->ps->weaponstate != WEAPON_FIRING*/ ) { //ZCM
 		if ( pm->ps->weapon != pm->cmd.weapon ) {
 			PM_BeginWeaponChange( pm->cmd.weapon );
 		}
-	}
+	//}
 
 	if ( pm->ps->weaponTime > 0 ) {
 		return;
@@ -1795,33 +1864,186 @@ are being updated isntead of a full move
 ================
 */
 void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
-	short		temp;
+	short		temp[2];
 	int		i;
+	int j;
+	float zoomMult;
+	float midGapDist;
+	float innerGapDist;
+	float freeAimDist;
+	vec3_t maxPos;
+	vec3_t minPos;
 
-	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPINTERMISSION) {
-		return;		// no view changes at all
+	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPINTERMISSION)  return;		// no view changes at all
+	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 )	return;  
+	
+	pm->maxGapDist = 90;
+	midGapDist = pm->maxGapDist/4;
+	innerGapDist = pm->maxGapDist/5;
+	freeAimDist = pm->maxGapDist/6;
+
+	minPos[0] = 1;
+	maxPos[0] = -5;
+
+	minPos[1] = -7.5;
+	maxPos[1] = 7.5;
+
+	minPos[2] = -20;
+	maxPos[2] = -10;
+
+	for (i=0 ; i<2 ; i++) {		
+		temp[i] = cmd->angles[i] + ps->delta_angles[i];
+
+		//remove the justspawned variable
+		if((ps->pm_flags & PMF_RESPAWNED) && pm->ps->pm_type != PM_DEAD  ){
+			ps->viewangles[i] = SHORT2ANGLE(temp[i]);
+			ps->weaponAngles[i] = ps->viewangles[i];
+		} else {
+			ps->weaponAngles[i] =  SHORT2ANGLE(temp[i]);
+		}
+
+		pm->weapViewGap[i] = ps->weaponAngles[i] - ps->viewangles[i];
+		pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i])))); //I need to fix this //zcm an evaluation that changed angles 90-180 and 180-360 would be faster probably.
+
+		pm->viewMult[i] = pm->weapViewGap[i]/pm->maxGapDist;
+		pm->viewMult[i] = fabs(pm->viewMult[i]);
+
+		if (pm->viewMult[i] > 1 ) pm->viewMult[i] = 1;
 	}
 
-	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 ) {
-		return;		// no view changes at all
+	pm->dist = sqrt((pm->weapViewGap[0] *pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1]));
+
+	//cgame stores pm-> values, game creates a new pm-> every clientthink
+
+	if (ps->pm_flags & PMF_ZOOM){
+		pm->maxGapDist *= .25;
 	}
 
-	// circularly clamp the angles with deltas
-	for (i=0 ; i<3 ; i++) {
-		temp = cmd->angles[i] + ps->delta_angles[i];
-		if ( i == PITCH ) {
-			// don't let the player look up or down more than 90 degrees
-			if ( temp > 16000 ) {
-				ps->delta_angles[i] = 16000 - cmd->angles[i];
-				temp = 16000;
-			} else if ( temp < -16000 ) {
-				ps->delta_angles[i] = -16000 - cmd->angles[i];
-				temp = -16000;
+//This all works. I secretly don't know why it works.
+	for (i=0 ; i<2 ; i++) {
+		//Com_Printf("%f  ", pm->weapViewGap[0]);
+		//Com_Printf("%f\n", pm->weapViewGap[1]);
+
+		if (pm->dist <= freeAimDist){ //need to do this all in a more efficient way since q3a "delta compresses" this might cause lag.
+			//Com_Printf("A");
+		} else {
+				
+			if (pm->dist <= innerGapDist){
+				ps->viewangles[i] = ps->weaponAngles[i] - .99999 * (1- pm->viewMult[i]) * pm->weapViewGap[i];
+			}
+			if (pm->dist <= midGapDist){
+				ps->viewangles[i] = ps->weaponAngles[i] - .99999 * (1- pm->viewMult[i]) * pm->weapViewGap[i];
+			}
+			if (pm->dist <= pm->maxGapDist){
+				ps->viewangles[i] = ps->weaponAngles[i] - .99999 * (1- pm->viewMult[i] * pm->viewMult[i]) * pm->weapViewGap[i];
 			}
 		}
-		ps->viewangles[i] = SHORT2ANGLE(temp);
 	}
 
+
+	if (ps->pm_flags & PMF_WEAPONLEFT){
+		ps->weaponOffset[1] -= .1;
+	}
+	
+	if (ps->pm_flags & PMF_WEAPONRIGHT){
+		ps->weaponOffset[1] += .1;
+	}
+
+	if((ps->pm_flags & PMF_WEAPONLEFT) && (ps->pm_flags & PMF_WEAPONRIGHT)){
+		ps->pm_flags &= ~PMF_WEAPONLEFT;
+		ps->pm_flags &= ~PMF_WEAPONRIGHT;
+		ps->weaponOffset[1] = 0 ;
+	}
+
+
+	if(ps->weaponOffset[1] < minPos[1]){
+		ps->weaponOffset[1] = minPos[1];
+	}
+
+	if(ps->weaponOffset[1] > maxPos[1]){
+		ps->weaponOffset[1] = maxPos[1];
+	}
+	
+	//Com_Printf("uva %f, %f, %f ", ps->viewangles[0], ps->viewangles[1], ps->viewangles[2]);
+
+	pm->dist = sqrt(fabs((pm->weapViewGap[0] *pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1])));
+	//The origin is now simply in relation to the screen, should it be in forward relation to the weapon?
+
+	//pm->ps->viewangles[0] = 0;
+	//pm->ps->viewangles[1] = 0;
+}
+
+
+static void PM_ArticulateWeapon(vec3_t angles) {
+	float	scale;
+	float	fracsin;
+	float	flatSpeed, bobFrac;
+	float	phase;
+	float	spreadfrac;
+	float	yawDiff, pitchDiff;
+	int		delta;
+	int		bobCycle;
+	int		i;
+	vec3_t oldAng;
+
+	flatSpeed = sqrt( pm->ps->velocity[0] *  pm->ps->velocity[0] + pm->ps->velocity[1] * pm->ps->velocity[1] );
+
+	bobCycle = ( pm->ps->bobCycle & 128 ) >> 7;
+	bobFrac = fabs( sin( ( pm->ps->bobCycle & 127 ) / 127.0 * M_PI ) );
+
+	if ( bobCycle & 1 ) {
+		scale = -flatSpeed;
+	} else {
+		scale = flatSpeed;
+	}
+ 
+	//pitchDiff = pm->ps->viewangles[0] - pm->oldViewAng[0];
+	//yawDiff= pm->ps->viewangles[1] - pm->oldViewAng[1];
+
+//DOESN'T WORK RIGHT NOW.
+	//angles[PITCH] += pitchDiff * 4;
+	//angles[YAW] += yawDiff * 4;
+
+	//angles[ROLL] += scale * bobFrac * 0.005;
+	//angles[YAW] += scale * bobFrac * 0.01;
+	//angles[PITCH] += flatSpeed * bobFrac * 0.005;
+
+//DOESN'T WORK RIGHT NOW.
+
+
+	//the beginning stage of deadzone aiming
+
+	// DROP THE WEAPON WHEN LANDING //DON'T DO THESE YET DO THEM LATER PLEASE
+	//CAUSE IT'S COOL
+	//delta = cg.time - cg.landTime;
+	//if ( delta < LAND_DEFLECT_TIME ) {
+	//	origin[2] += cg.landChange*0.25 * delta / LAND_DEFLECT_TIME;
+	//} else if ( delta < LAND_DEFLECT_TIME + LAND_RETURN_TIME ) {
+	//	origin[2] += cg.landChange*0.25 * 
+	//		(LAND_DEFLECT_TIME + LAND_RETURN_TIME - delta) / LAND_RETURN_TIME;
+	//}
+
+#if 0
+	// DROP THE WEAPON WHEN STAIR CLIMBING
+	//delta = cg.time - cg.stepTime;
+	//if ( delta < STEP_TIME/2 ) {
+	//	origin[2] -= cg.stepChange*0.25 * delta / (STEP_TIME/2);
+	//} else if ( delta < STEP_TIME ) {
+	//	origin[2] -= cg.stepChange*0.25 * (STEP_TIME - delta) / (STEP_TIME/2);
+	//}
+#endif
+
+	// idle drift
+	//if(pm->cmd.buttons & BUTTON_ATTACK ){ //need to do a lot to get zoom to work
+		spreadfrac = 5 + (flatSpeed/50);
+              
+		//rand()%90 doesn't work perfeclty for making all players on server different
+		phase = (pm->cmd.serverTime) / 1000.0 * SWAY_PITCH_FREQUENCY * M_PI * 2;
+		angles[PITCH] += SWAY_PITCH_AMPLITUDE * sin( phase ) * ( spreadfrac + SWAY_PITCH_MIN_AMPLITUDE );
+		phase = (pm->cmd.serverTime) / 1000.0 * SWAY_YAW_FREQUENCY * M_PI * 2;
+		angles[YAW] += SWAY_YAW_AMPLITUDE * sin( phase ) * ( spreadfrac + SWAY_YAW_MIN_AMPLITUDE );
+	//}
+	//Com_Printf("ang %f %f %f  \n",angles[0],angles[1],angles[2]); //ZCM track accuracy between game/cgame modules
 }
 
 
@@ -1908,10 +2130,13 @@ void PmoveSingle (pmove_t *pmove) {
 
 	pml.frametime = pml.msec * 0.001;
 
-	// update the viewangles
+	// update the viewangles 
 	PM_UpdateViewAngles( pm->ps, &pm->cmd );
+	AngleVectors (pm->ps->weaponAngles, pml.forward, pml.right, pml.up);
+	//NEEDs to be handled differently. idle anim shouldn't play while moving or aiming
+	//PM_ArticulateWeapon(pm->ps->weaponAngles);
 
-	AngleVectors (pm->ps->viewangles, pml.forward, pml.right, pml.up);
+
 
 	if ( pm->cmd.upmove < 10 ) {
 		// not holding jump
@@ -1931,12 +2156,17 @@ void PmoveSingle (pmove_t *pmove) {
 		pm->cmd.upmove = 0;
 	}
 
+	if ( pm->ps->pm_flags & PMF_SPRINT ) {
+		PM_SprintMove(); 
+	} 
+
 	if ( pm->ps->pm_type == PM_SPECTATOR ) {
 		PM_CheckDuck ();
 		PM_FlyMove ();
 		PM_DropTimers ();
 		return;
 	}
+
 
 	if ( pm->ps->pm_type == PM_NOCLIP ) {
 		PM_NoclipMove ();
@@ -1963,7 +2193,7 @@ void PmoveSingle (pmove_t *pmove) {
 	PM_GroundTrace();
 
 	if ( pm->ps->pm_type == PM_DEAD ) {
-		PM_DeadMove ();
+		PM_DeadMove();
 	}
 
 	PM_DropTimers();
@@ -2001,6 +2231,8 @@ void PmoveSingle (pmove_t *pmove) {
 
 	// weapons
 	PM_Weapon();
+	//PM_WeaponLeft();
+	//PM_WeaponRight();
 
 	// torso animation
 	PM_TorsoAnimation();

@@ -1287,6 +1287,7 @@ done:
 	return buf_p - buffer;
 }
 
+
 /* this is really crappy */
 int sscanf( const char *buffer, const char *fmt, ... ) {
 	int		cmd;

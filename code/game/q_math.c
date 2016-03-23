@@ -338,8 +338,7 @@ RotatePointAroundVector
 This is not implemented very well...
 ===============
 */
-void RotatePointAroundVector( vec3_t dst, const vec3_t dir, const vec3_t point,
-							 float degrees ) {
+void RotatePointAroundVector( vec3_t dst, const vec3_t dir, const vec3_t point, float degrees ) {
 	float	m[3][3];
 	float	im[3][3];
 	float	zrot[3][3];

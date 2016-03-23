@@ -162,6 +162,11 @@ typedef struct {
 
 //=================================================
 
+typedef struct{
+
+	vec3_t	points[8]; //made to match Total_Coll_Points
+
+} box;
 
 
 // centity_t have a direct corespondence with gentity_t in the game, but
@@ -1092,6 +1097,9 @@ extern	vmCvar_t		cg_drawTimer;
 extern	vmCvar_t		cg_drawFPS;
 extern	vmCvar_t		cg_drawSnapshot;
 extern	vmCvar_t		cg_draw3dIcons;
+extern	vmCvar_t		cg_drawPlayerBBox; //ZCM
+extern	vmCvar_t		cg_PlayerLean; //ZCM
+extern	vmCvar_t		cg_debugTrailTime;
 extern	vmCvar_t		cg_drawIcons;
 extern	vmCvar_t		cg_drawAmmoWarning;
 extern	vmCvar_t		cg_drawCrosshair;
@@ -1118,9 +1126,12 @@ extern	vmCvar_t		cg_footsteps;
 extern	vmCvar_t		cg_addMarks;
 extern	vmCvar_t		cg_brassTime;
 extern	vmCvar_t		cg_gun_frame;
-extern	vmCvar_t		cg_gun_x;
-extern	vmCvar_t		cg_gun_y;
-extern	vmCvar_t		cg_gun_z;
+//extern	vmCvar_t		cg_gun_x;
+//extern	vmCvar_t		cg_gun_y;
+//extern	vmCvar_t		cg_gun_z;
+extern	vmCvar_t		gun_x;
+extern	vmCvar_t		gun_y;
+extern	vmCvar_t		gun_z;
 extern	vmCvar_t		cg_drawGun;
 extern	vmCvar_t		cg_viewsize;
 extern	vmCvar_t		cg_tracerChance;
@@ -1312,6 +1323,8 @@ sfxHandle_t	CG_CustomSound( int clientNum, const char *soundName );
 //
 void CG_BuildSolidList( void );
 int	CG_PointContents( const vec3_t point, int passEntityNum );
+void CG_PlayerTrace( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, 
+					 int skipNumber, int mask, const vec3_t origin, const vec3_t viewangles );
 void CG_Trace( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, 
 					 int skipNumber, int mask );
 void CG_PredictPlayerState( void );
@@ -1665,5 +1678,4 @@ void	CG_ParticleMisc (qhandle_t pshader, vec3_t origin, int size, int duration, 
 void	CG_ParticleExplosion (char *animStr, vec3_t origin, vec3_t vel, int duration, int sizeStart, int sizeEnd);
 extern qboolean		initparticles;
 int CG_NewParticleArea ( int num );
-
 

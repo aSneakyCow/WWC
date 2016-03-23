@@ -495,11 +495,19 @@ int CL_CgameSystemCalls( int *args ) {
 	case CG_CM_BOXTRACE:
 		CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], /*int capsule*/ qfalse );
 		return 0;
+	case CG_CM_TRACEPLAYER:
+		CM_BoxTracePlayer( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], VMA(8), /*int capsule*/ qfalse );
+		return 0;
 	case CG_CM_CAPSULETRACE:
 		CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], /*int capsule*/ qtrue );
 		return 0;
 	case CG_CM_TRANSFORMEDBOXTRACE:
+
 		CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], VMA(8), VMA(9), /*int capsule*/ qfalse );
+		return 0;
+	case CG_CM_TRANSFORMEDPLAYERBOXTRACE:
+
+		CM_TransformedPlayerBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], VMA(8), VMA(9), VMA(10), /*int capsule*/ qfalse );
 		return 0;
 	case CG_CM_TRANSFORMEDCAPSULETRACE:
 		CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], VMA(8), VMA(9), /*int capsule*/ qtrue );

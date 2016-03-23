@@ -152,7 +152,8 @@ void SnapVectorTowards( vec3_t v, vec3_t to ) {
 #ifdef MISSIONPACK
 #define CHAINGUN_SPREAD		600
 #endif
-#define MACHINEGUN_SPREAD	200
+#define MACHINEGUN_SPREAD	0 //helps when testing freeaim
+//#define MACHINEGUN_SPREAD	200
 #define	MACHINEGUN_DAMAGE	7
 #define	MACHINEGUN_TEAM_DAMAGE	5		// wimpier MG in teamplay
 
@@ -522,7 +523,7 @@ void weapon_railgun_fire (gentity_t *ent) {
 	SnapVectorTowards( trace.endpos, muzzle );
 
 	// send railgun beam effect
-	tent = G_TempEntity( trace.endpos, EV_RAILTRAIL );
+	tent = G_TempEntity( ent->client->ps.weaponOffset, EV_RAILTRAIL );
 
 	// set player number for custom colors on the railtrail
 	tent->s.clientNum = ent->s.clientNum;
@@ -584,8 +585,7 @@ void Weapon_HookFree (gentity_t *ent)
 	G_FreeEntity( ent );
 }
 
-void Weapon_HookThink (gentity_t *ent)
-{
+void Weapon_HookThink (gentity_t *ent){
 	if (ent->enemy) {
 		vec3_t v, oldorigin;
 
@@ -781,7 +781,7 @@ set muzzle location relative to pivoting eye
 */
 void CalcMuzzlePoint ( gentity_t *ent, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint ) {
 	VectorCopy( ent->s.pos.trBase, muzzlePoint );
-	muzzlePoint[2] += ent->client->ps.viewheight;
+	muzzlePoint[2] += ent->client->ps.viewPos[1];
 	VectorMA( muzzlePoint, 14, forward, muzzlePoint );
 	// snap to integer coordinates for more efficient network bandwidth usage
 	SnapVector( muzzlePoint );
@@ -794,12 +794,21 @@ CalcMuzzlePointOrigin
 set muzzle location relative to pivoting eye
 ===============
 */
-void CalcMuzzlePointOrigin ( gentity_t *ent, vec3_t origin, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint ) {
-	VectorCopy( ent->s.pos.trBase, muzzlePoint );
-	muzzlePoint[2] += ent->client->ps.viewheight;
-	VectorMA( muzzlePoint, 14, forward, muzzlePoint );
+
+void CalcMuzzlePointOrigin ( gentity_t *ent, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint ) {
+	VectorCopy( ent->s.pos.trBase, muzzlePoint ); //position
+
+	muzzlePoint[2] += ent->client->ps.viewPos[1];
+
+	// VectorMA(v,s,b,o) - make b s units long, add to v, result in o 
+	VectorMA( muzzlePoint, 0, forward, muzzlePoint );
+	VectorMA( muzzlePoint, .5 * ent->client->ps.weaponOffset[1], right, muzzlePoint );
+	VectorMA( muzzlePoint, ent->client->ps.weaponOffset[2] + 10, up, muzzlePoint );
+
 	// snap to integer coordinates for more efficient network bandwidth usage
 	SnapVector( muzzlePoint );
+	
+	VectorCopy(muzzlePoint, ent->client->ps.weaponOrigin);
 }
 
 
@@ -810,6 +819,8 @@ FireWeapon
 ===============
 */
 void FireWeapon( gentity_t *ent ) {
+	playerState_t * ps;
+	vec3_t	dir;
 	if (ent->client->ps.powerups[PW_QUAD] ) {
 		s_quadFactor = g_quadfactor.value;
 	} else {
@@ -833,11 +844,12 @@ void FireWeapon( gentity_t *ent ) {
 		ent->client->accuracy_shots++;
 #endif
 	}
+	ps = &ent->client->ps;
 
 	// set aiming directions
-	AngleVectors (ent->client->ps.viewangles, forward, right, up);
-
-	CalcMuzzlePointOrigin ( ent, ent->client->oldOrigin, forward, right, up, muzzle );
+	//AngleVectors (ent->client->ps.viewangles, forward, right, up);
+	AngleVectors (ent->client->ps.weaponAngles, forward, right, up); //zcm
+	CalcMuzzlePointOrigin ( ent, forward, right, up, muzzle );
 
 	// fire the specific weapon
 	switch( ent->s.weapon ) {

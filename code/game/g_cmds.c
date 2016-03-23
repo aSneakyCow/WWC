@@ -256,8 +256,8 @@ void Cmd_Give_f (gentity_t *ent)
 
 	if (give_all || Q_stricmp(name, "weapons") == 0)
 	{
-		ent->client->ps.stats[STAT_WEAPONS] = (1 << WP_NUM_WEAPONS) - 1 - 
-			( 1 << WP_GRAPPLING_HOOK ) - ( 1 << WP_NONE );
+		ent->client->ps.stats[STAT_WEAPONS] = (1 << WP_NUM_WEAPONS) - 1/* - 
+			( 1 << WP_GRAPPLING_HOOK ) */- ( 1 << WP_NONE ); //zcm allow grapple to be give with all weaps
 		if (!give_all)
 			return;
 	}
@@ -299,6 +299,7 @@ void Cmd_Give_f (gentity_t *ent)
 		ent->client->ps.persistant[PERS_ASSIST_COUNT]++;
 		return;
 	}
+
 
 	// spawn a specific item right on the player
 	if ( !give_all ) {
@@ -1590,6 +1591,30 @@ void Cmd_Stats_f( gentity_t *ent ) {
 */
 }
 
+void Cmd_Player_Sprint( gentity_t *ent ) {
+	ent->client->ps.pm_flags ^= PMF_SPRINT;
+	Com_Printf("Sprint ");
+
+	if( ent->client->ps.pm_flags & PMF_SPRINT){
+		Com_Printf("ON!!\n");
+	} else { 
+		Com_Printf("Off!\n");
+	}
+
+}
+
+void Cmd_Player_Zoomin( gentity_t *ent ) {
+	ent->client->ps.pm_flags ^= PMF_ZOOM;
+}
+
+void Cmd_Weapon_Right( gentity_t *ent ) {
+	ent->client->ps.pm_flags ^= PMF_WEAPONRIGHT;
+}
+
+void Cmd_Weapon_Left( gentity_t *ent ) { //zcm
+	ent->client->ps.pm_flags ^= PMF_WEAPONLEFT;
+}
+
 /*
 =================
 ClientCommand
@@ -1696,6 +1721,14 @@ void ClientCommand( int clientNum ) {
 		Cmd_SetViewpos_f( ent );
 	else if (Q_stricmp (cmd, "stats") == 0)
 		Cmd_Stats_f( ent );
+	else if (Q_stricmp (cmd, "sprint") == 0)
+		Cmd_Player_Sprint( ent );
+	else if (Q_stricmp (cmd, "zoom") == 0) // commands like these could flood servers so i would need to find a way to do it like +zoom
+		Cmd_Player_Zoomin( ent );  
+	else if (Q_stricmp (cmd, "weaponright") == 0) // commands like these could flood servers so i would need to find a way to do it like +zoom
+		Cmd_Weapon_Right( ent );  
+	else if (Q_stricmp (cmd, "weaponleft") == 0) // commands like these could flood servers so i would need to find a way to do it like +zoom
+		Cmd_Weapon_Left( ent );
 	else
 		trap_SendServerCommand( clientNum, va("print \"unknown cmd %s\n\"", cmd ) );
 }

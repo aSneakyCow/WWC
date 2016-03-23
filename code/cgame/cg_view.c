@@ -158,9 +158,9 @@ static void CG_AddTestModel (void) {
 
 		// allow the position to be adjusted
 		for (i=0 ; i<3 ; i++) {
-			cg.testModelEntity.origin[i] += cg.refdef.viewaxis[0][i] * cg_gun_x.value;
-			cg.testModelEntity.origin[i] += cg.refdef.viewaxis[1][i] * cg_gun_y.value;
-			cg.testModelEntity.origin[i] += cg.refdef.viewaxis[2][i] * cg_gun_z.value;
+			cg.testModelEntity.origin[i] += cg.refdef.viewaxis[0][i] * gun_x.value;
+			cg.testModelEntity.origin[i] += cg.refdef.viewaxis[1][i] * gun_y.value;
+			cg.testModelEntity.origin[i] += cg.refdef.viewaxis[2][i] * gun_z.value;
 		}
 	}
 
@@ -229,7 +229,7 @@ static void CG_OffsetThirdPersonView( void ) {
 	float		focusDist;
 	float		forwardScale, sideScale;
 
-	cg.refdef.vieworg[2] += cg.predictedPlayerState.viewheight;
+	cg.refdef.vieworg[2] += cg.predictedPlayerState.viewPos[1];
 
 	VectorCopy( cg.refdefViewAngles, focusAngles );
 
@@ -331,7 +331,7 @@ static void CG_OffsetFirstPersonView( void ) {
 		angles[ROLL] = 40;
 		angles[PITCH] = -15;
 		angles[YAW] = cg.snap->ps.stats[STAT_DEAD_YAW];
-		origin[2] += cg.predictedPlayerState.viewheight;
+		origin[2] += cg.predictedPlayerState.viewPos[1];
 		return;
 	}
 
@@ -390,7 +390,7 @@ static void CG_OffsetFirstPersonView( void ) {
 //===================================
 
 	// add view height
-	origin[2] += cg.predictedPlayerState.viewheight;
+	origin[2] += cg.predictedPlayerState.viewPos[1];
 
 	// smooth out duck height changes
 	timeDelta = cg.time - cg.duckTime;
@@ -749,6 +749,26 @@ static void CG_PlayBufferedSounds( void ) {
 	}
 }
 
+extern void CG_DebugTrail (vec3_t start, vec3_t end, vec3_t offset);
+
+void cg_drawBBox(vec3_t origin){
+	CG_DebugTrail( pm->body.points[BOT_FL], pm->body.points[BOT_FR], origin);
+	CG_DebugTrail( pm->body.points[BOT_FR], pm->body.points[BOT_RR], origin);
+	CG_DebugTrail( pm->body.points[BOT_RR], pm->body.points[BOT_RL], origin);
+	CG_DebugTrail( pm->body.points[BOT_RL], pm->body.points[BOT_FL], origin);
+
+	CG_DebugTrail( pm->body.points[BOT_FL], pm->body.points[TOP_FL], origin);
+	CG_DebugTrail( pm->body.points[BOT_FR], pm->body.points[TOP_FR], origin);
+	CG_DebugTrail( pm->body.points[BOT_RR], pm->body.points[TOP_RR], origin);
+	CG_DebugTrail( pm->body.points[BOT_RL], pm->body.points[TOP_RL], origin);
+
+	CG_DebugTrail( pm->body.points[TOP_FL], pm->body.points[TOP_FR], origin);
+	CG_DebugTrail( pm->body.points[TOP_FR], pm->body.points[TOP_RR], origin);
+	CG_DebugTrail( pm->body.points[TOP_RR], pm->body.points[TOP_RL], origin);
+	CG_DebugTrail( pm->body.points[TOP_RL], pm->body.points[TOP_FL], origin);
+}
+
+
 //=========================================================================
 
 /*
@@ -867,10 +887,12 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	// actually issue the rendering calls
 	CG_DrawActive( stereoView );
 
+	if(cg_drawPlayerBBox.integer){
+		cg_drawBBox(pm->ps->origin);
+	}
+
 	if ( cg_stats.integer ) {
 		CG_Printf( "cg.clientFrame:%i\n", cg.clientFrame );
 	}
 
-
 }
-
