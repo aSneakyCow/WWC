@@ -160,9 +160,14 @@ typedef enum {
 #define PMF_FOLLOW			4096	// spectate following another player
 #define PMF_SCOREBOARD		8192	// spectate as a scoreboard
 #define PMF_INVULEXPAND		16384	// invulnerability sphere set to full size
-#define PMF_ZOOM			32768	// zcm
-#define PMF_WEAPONLEFT		65536	// zcm
-#define PMF_WEAPONRIGHT		131072	// zcm
+
+
+// pmove->pm_weapFlags
+#define PMF_WEAPONRIGHT			1	// zcm
+#define PMF_WEAPONLEFT			2	// zcm
+#define PMF_ZOOM		4	// zcm
+
+
 
 
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)

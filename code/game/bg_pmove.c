@@ -400,15 +400,10 @@ static void PM_SprintMove( void ){
 
 		VectorClear(pm->body.points[i]);
 
-		VectorMA( pm->body.points[i], dir *		BOX_GIRTH,	forward,	pm->body.points[i]);
-		VectorMA( pm->body.points[i], -dir2 *	BOX_GIRTH,	right,		pm->body.points[i]);
-		VectorMA( pm->body.points[i], dir3 *	BOX_HEIGHT,	up,			pm->body.points[i]);
-
-		VectorCopy( pm->body.points[i], traceBody[i]);
-		//Com_Printf( "sm %i: %f, %f, %f  ", i, pm->body.points[i][0], pm->body.points[i][1], pm->body.points[i][2] );
-		//Com_Printf( "\n" );
+		VectorMA( pm->body.points[i], dir * BOX_GIRTH,		forward,	pm->body.points[i]);
+		VectorMA( pm->body.points[i], dir2 * BOX_GIRTH,		right,		pm->body.points[i]);
+		VectorMA( pm->body.points[i], dir3 * BOX_HEIGHT,	up,			pm->body.points[i]);
 	}
-	//Com_Printf( "\n" );
 }
  
 /*
@@ -1865,28 +1860,31 @@ are being updated isntead of a full move
 */
 void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	short		temp[2];
-	int		i;
-	int j;
-	float zoomMult;
-	float midGapDist;
-	float innerGapDist;
-	float freeAimDist;
-	vec3_t maxPos;
-	vec3_t minPos;
+	int			i;
+	int			j;
+	float		midGapDist, freeAimDist, deadZone, dZFallOff, zoomMult;
+	vec3_t		maxPos;
+	vec3_t		minPos;
+	int			weaponReset;
 
 	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPINTERMISSION)  return;		// no view changes at all
 	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 )	return;  
 	
 	pm->maxGapDist = 90;
-	midGapDist = pm->maxGapDist/4;
-	innerGapDist = pm->maxGapDist/5;
+
+	if (ps->pm_weapFlags & PMF_ZOOM){
+		pm->maxGapDist *= .1;
+		dZFallOff = 2;
+	} else {
+		dZFallOff = 5;
+	}
 	freeAimDist = pm->maxGapDist/6;
 
 	minPos[0] = 1;
 	maxPos[0] = -5;
 
-	minPos[1] = -7.5;
-	maxPos[1] = 7.5;
+	minPos[1] = -12;
+	maxPos[1] = 12;
 
 	minPos[2] = -20;
 	maxPos[2] = -10;
@@ -1894,16 +1892,15 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	for (i=0 ; i<2 ; i++) {		
 		temp[i] = cmd->angles[i] + ps->delta_angles[i];
 
-		//remove the justspawned variable
 		if((ps->pm_flags & PMF_RESPAWNED) && pm->ps->pm_type != PM_DEAD  ){
-			ps->viewangles[i] = SHORT2ANGLE(temp[i]);
+			ps->viewangles[i] = SHORT2ANGLE(temp[i]);//have the viewangles follow the view for the first frame after respawning
 			ps->weaponAngles[i] = ps->viewangles[i];
 		} else {
 			ps->weaponAngles[i] =  SHORT2ANGLE(temp[i]);
 		}
 
 		pm->weapViewGap[i] = ps->weaponAngles[i] - ps->viewangles[i];
-		pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i])))); //I need to fix this //zcm an evaluation that changed angles 90-180 and 180-360 would be faster probably.
+		pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i])))); //is this the best method?
 
 		pm->viewMult[i] = pm->weapViewGap[i]/pm->maxGapDist;
 		pm->viewMult[i] = fabs(pm->viewMult[i]);
@@ -1912,67 +1909,56 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	}
 
 	pm->dist = sqrt((pm->weapViewGap[0] *pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1]));
+	//dist just represents the gap between the weapon and the edge of the view frustrum
+	//if you have fov 90 set and move your gun so half of it is off the screen, dist will be 45
+	//cgame stores pm-> values, qagame creates a new pm-> every clientthink
 
-	//cgame stores pm-> values, game creates a new pm-> every clientthink
-
-	if (ps->pm_flags & PMF_ZOOM){
-		pm->maxGapDist *= .25;
-	}
-
-//This all works. I secretly don't know why it works.
+	//This all works. I secretly don't know why it works. Ah, now I get it
 	for (i=0 ; i<2 ; i++) {
-		//Com_Printf("%f  ", pm->weapViewGap[0]);
-		//Com_Printf("%f\n", pm->weapViewGap[1]);
-
 		if (pm->dist <= freeAimDist){ //need to do this all in a more efficient way since q3a "delta compresses" this might cause lag.
-			//Com_Printf("A");
+		//Com_Printf("C: %f\n", pm->dist);
 		} else {
-				
-			if (pm->dist <= innerGapDist){
-				ps->viewangles[i] = ps->weaponAngles[i] - .99999 * (1- pm->viewMult[i]) * pm->weapViewGap[i];
-			}
-			if (pm->dist <= midGapDist){
-				ps->viewangles[i] = ps->weaponAngles[i] - .99999 * (1- pm->viewMult[i]) * pm->weapViewGap[i];
-			}
+			deadZone = (1 -  dZFallOff * pm->viewMult[i] * pm->viewMult[i] * pm->viewMult[i]);
 			if (pm->dist <= pm->maxGapDist){
-				ps->viewangles[i] = ps->weaponAngles[i] - .99999 * (1- pm->viewMult[i] * pm->viewMult[i]) * pm->weapViewGap[i];
+				ps->viewangles[i] = ps->weaponAngles[i] - deadZone * pm->weapViewGap[i];
+			} else {
+				//ps->viewangles[i] = ps->weaponAngles[i] - deadZone * pm->weapViewGap[i];
 			}
-		}
+		}	
 	}
+	//check that projectile is coming from weapon origin and not screen origin offset instead of the screen
+	ps->weaponAngles[2] = 0;
 
-
-	if (ps->pm_flags & PMF_WEAPONLEFT){
+	if (ps->pm_weapFlags & PMF_WEAPONLEFT){
 		ps->weaponOffset[1] -= .1;
 	}
 	
-	if (ps->pm_flags & PMF_WEAPONRIGHT){
+	if (ps->pm_weapFlags & PMF_WEAPONRIGHT){
 		ps->weaponOffset[1] += .1;
 	}
 
-	if((ps->pm_flags & PMF_WEAPONLEFT) && (ps->pm_flags & PMF_WEAPONRIGHT)){
-		ps->pm_flags &= ~PMF_WEAPONLEFT;
-		ps->pm_flags &= ~PMF_WEAPONRIGHT;
-		ps->weaponOffset[1] = 0 ;
+	if((ps->pm_weapFlags & PMF_WEAPONLEFT) && (ps->pm_weapFlags & PMF_WEAPONRIGHT)){
+		//stop moving if both are activated
+		ps->pm_weapFlags &= ~PMF_WEAPONLEFT;
+		ps->pm_weapFlags &= ~PMF_WEAPONRIGHT;
+		if(fabs(ps->weaponOffset[1]) > 0){
+		} else if (ps->weaponOffset[1] < 0) {
+		}
 	}
 
-
 	if(ps->weaponOffset[1] < minPos[1]){
+		ps->pm_weapFlags &= ~PMF_WEAPONLEFT;
 		ps->weaponOffset[1] = minPos[1];
 	}
 
 	if(ps->weaponOffset[1] > maxPos[1]){
+		ps->pm_weapFlags &= ~PMF_WEAPONRIGHT;
 		ps->weaponOffset[1] = maxPos[1];
-	}
-	
-	//Com_Printf("uva %f, %f, %f ", ps->viewangles[0], ps->viewangles[1], ps->viewangles[2]);
+	} 
 
 	pm->dist = sqrt(fabs((pm->weapViewGap[0] *pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1])));
 	//The origin is now simply in relation to the screen, should it be in forward relation to the weapon?
-
-	//pm->ps->viewangles[0] = 0;
-	//pm->ps->viewangles[1] = 0;
 }
-
 
 static void PM_ArticulateWeapon(vec3_t angles) {
 	float	scale;
@@ -2133,10 +2119,8 @@ void PmoveSingle (pmove_t *pmove) {
 	// update the viewangles 
 	PM_UpdateViewAngles( pm->ps, &pm->cmd );
 	AngleVectors (pm->ps->weaponAngles, pml.forward, pml.right, pml.up);
-	//NEEDs to be handled differently. idle anim shouldn't play while moving or aiming
+	//NEEDs to be handled differently. idle anim shouldn't play while moving, aiming, or airborne
 	//PM_ArticulateWeapon(pm->ps->weaponAngles);
-
-
 
 	if ( pm->cmd.upmove < 10 ) {
 		// not holding jump
@@ -2155,6 +2139,7 @@ void PmoveSingle (pmove_t *pmove) {
 		pm->cmd.rightmove = 0;
 		pm->cmd.upmove = 0;
 	}
+
 
 	if ( pm->ps->pm_flags & PMF_SPRINT ) {
 		PM_SprintMove(); 

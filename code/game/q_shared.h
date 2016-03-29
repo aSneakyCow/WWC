@@ -1151,6 +1151,7 @@ typedef struct playerState_s {
 	int			pm_type;
 	int			bobCycle;		// for view bobbing and footstep generation
 	int			pm_flags;		// ducked, jump_held, etc
+	int			pm_weapFlags;	//currently used for switching hands and zooming, but will be replaced with +switchLft and +switchRight or +switchHand
 	int			pm_time;
 
 	vec3_t		origin;

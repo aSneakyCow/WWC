@@ -1471,10 +1471,10 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 		AnglesToAxis( legsAngles, axis );
 		side = speed * cg_PlayerLean.integer * mult * DotProduct( velocity, axis[1] );
 		if (side > 90) side = 90;
-		if (side < -90) side = -90;//zcm
+		if (side < -90) side = -90;//zcm 
 		legsAngles[ROLL] -= side;
 
-		side = speed * cg_PlayerLean.integer * mult * slowForward *DotProduct( velocity, axis[0] );
+		side = speed * cg_PlayerLean.integer * mult * slowForward * DotProduct( velocity, axis[0] );
 		if (side > 90) side = 90;
 		if (side < -90) side = -90;//zcm
 		legsAngles[PITCH] += side;
@@ -1482,14 +1482,12 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 		lastZedVel = velocity[2];//zcm
 	}
 
-	ramp = ramp*.9925;
-
+	ramp *=  .9925;
 	if(ramp >= 1.5){
 		ramp = 1.5;
 	} else if (ramp < 1){
 		ramp = 1;
 	} //zcm
-	//Com_Printf("Ramp: %f", ramp);
 
 	clientNum = cent->currentState.clientNum;
 	if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) {
