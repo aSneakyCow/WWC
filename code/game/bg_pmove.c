@@ -1861,34 +1861,37 @@ are being updated isntead of a full move
 void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	short		temp[2];
 	int			i;
-	int			j;
-	float		midGapDist, freeAimDist, deadZone, dZFallOff, zoomMult;
+	float		maxGapDist, freeAimDist, deadZone, zoomMult;
 	vec3_t		maxPos;
 	vec3_t		minPos;
 	int			weaponReset;
+	int			quad;
+	vec_t		viewReset[2];
+	//if you have fov 90 set and move your gun so half of it is off the screen, dist will be 45
 
 	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPINTERMISSION)  return;		// no view changes at all
 	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 )	return;  
 	
-	pm->maxGapDist = 90;
+	maxGapDist = 90;
 
-	if (ps->pm_weapFlags & PMF_ZOOM){
-		pm->maxGapDist *= .1;
-		dZFallOff = 2;
-	} else {
-		dZFallOff = 5;
+	if(ps->pm_weapFlags & PMF_ZOOM){
+		maxGapDist = 0;
 	}
-	freeAimDist = pm->maxGapDist/6;
 
-	minPos[0] = 1;
+	freeAimDist = maxGapDist/6;
+
+	//the endgoal is to create a curved 3D space that represents the bounds of where you can place your onscreen itemw/weappon
+	minPos[0] = 1;	//maximum forward and back.
 	maxPos[0] = -5;
 
-	minPos[1] = -12;
+	minPos[1] = -12; //maximum left or right on screen
 	maxPos[1] = 12;
 
-	minPos[2] = -20;
-	maxPos[2] = -10;
+	minPos[2] = -20; //maximum up or down on screen
+	maxPos[2] = -10; 
 
+
+//weapon rotation
 	for (i=0 ; i<2 ; i++) {		
 		temp[i] = cmd->angles[i] + ps->delta_angles[i];
 
@@ -1898,51 +1901,45 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		} else {
 			ps->weaponAngles[i] =  SHORT2ANGLE(temp[i]);
 		}
-
 		pm->weapViewGap[i] = ps->weaponAngles[i] - ps->viewangles[i];
-		pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i])))); //is this the best method?
+		pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i]))));
 
-		pm->viewMult[i] = pm->weapViewGap[i]/pm->maxGapDist;
-		pm->viewMult[i] = fabs(pm->viewMult[i]);
-
-		if (pm->viewMult[i] > 1 ) pm->viewMult[i] = 1;
-	}
-
-	pm->dist = sqrt((pm->weapViewGap[0] *pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1]));
-	//dist just represents the gap between the weapon and the edge of the view frustrum
-	//if you have fov 90 set and move your gun so half of it is off the screen, dist will be 45
-	//cgame stores pm-> values, qagame creates a new pm-> every clientthink
-
-	//This all works. I secretly don't know why it works. Ah, now I get it
-	for (i=0 ; i<2 ; i++) {
-		if (pm->dist <= freeAimDist){ //need to do this all in a more efficient way since q3a "delta compresses" this might cause lag.
-		//Com_Printf("C: %f\n", pm->dist);
+		if(maxGapDist != 0){
+			pm->viewMult[i] = pm->weapViewGap[i]/maxGapDist;
 		} else {
-			deadZone = (1 -  dZFallOff * pm->viewMult[i] * pm->viewMult[i] * pm->viewMult[i]);
-			if (pm->dist <= pm->maxGapDist){
-				ps->viewangles[i] = ps->weaponAngles[i] - deadZone * pm->weapViewGap[i];
-			} else {
-				//ps->viewangles[i] = ps->weaponAngles[i] - deadZone * pm->weapViewGap[i];
-			}
-		}	
+			pm->viewMult[i] = .75;
+		}
+
+		pm->viewMult[i] = fabs(pm->viewMult[i]);
+		if (pm->viewMult[i] > 1 ) pm->viewMult[i] = 1;
+	} 
+	
+	Com_Printf("%f ", pm->viewMult[0] );
+	Com_Printf("%f \n", pm->viewMult[1] );
+	
+	pm->dist = sqrt(fabs((pm->weapViewGap[0] * pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1])));
+	//dist represents the gap between the weapon and the edge of the view frustrum if fov is 90, dist will be 45 if weapon is halfway off edge of screen
+
+	if (pm->dist > freeAimDist){ 
+		for (i=0 ; i<2 ; i++) {
+			deadZone = pm->viewMult[i] * pm->viewMult[i] *pm->weapViewGap[i];
+			ps->viewangles[i] = ps->viewangles[i] + deadZone;
+		}
+	} else {
 	}
+
+//weapon translation
 	//check that projectile is coming from weapon origin and not screen origin offset instead of the screen
 	ps->weaponAngles[2] = 0;
 
-	if (ps->pm_weapFlags & PMF_WEAPONLEFT){
-		ps->weaponOffset[1] -= .1;
-	}
-	
-	if (ps->pm_weapFlags & PMF_WEAPONRIGHT){
-		ps->weaponOffset[1] += .1;
-	}
+	if (ps->pm_weapFlags & PMF_WEAPONLEFT)	ps->weaponOffset[1] -= .1; 
+	if (ps->pm_weapFlags & PMF_WEAPONRIGHT) ps->weaponOffset[1] += .1; 
 
 	if((ps->pm_weapFlags & PMF_WEAPONLEFT) && (ps->pm_weapFlags & PMF_WEAPONRIGHT)){
-		//stop moving if both are activated
 		ps->pm_weapFlags &= ~PMF_WEAPONLEFT;
 		ps->pm_weapFlags &= ~PMF_WEAPONRIGHT;
 		if(fabs(ps->weaponOffset[1]) > 0){
-		} else if (ps->weaponOffset[1] < 0) {
+		} else if (fabs(ps->weaponOffset[1]) < 0) {
 		}
 	}
 
@@ -1955,9 +1952,6 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		ps->pm_weapFlags &= ~PMF_WEAPONRIGHT;
 		ps->weaponOffset[1] = maxPos[1];
 	} 
-
-	pm->dist = sqrt(fabs((pm->weapViewGap[0] *pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1])));
-	//The origin is now simply in relation to the screen, should it be in forward relation to the weapon?
 }
 
 static void PM_ArticulateWeapon(vec3_t angles) {
