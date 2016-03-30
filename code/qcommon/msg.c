@@ -1115,6 +1115,7 @@ netField_t	playerStateFields[] =
 { PSF(weaponOffset[0]), 0 },
 { PSF(weaponOffset[1]), 0 },
 { PSF(module), 0 },
+{ PSF(zoomed), 0 },
 { PSF(weaponTime), -16 },
 { PSF(origin[2]), 0 },
 { PSF(velocity[2]), 0 },

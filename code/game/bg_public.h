@@ -165,7 +165,7 @@ typedef enum {
 // pmove->pm_weapFlags
 #define PMF_WEAPONRIGHT			1	// zcm
 #define PMF_WEAPONLEFT			2	// zcm
-#define PMF_ZOOM		4	// zcm
+#define PMF_WEAPONUP		4	// zcm
 
 
 
@@ -219,6 +219,7 @@ typedef struct {
 	vec2_t		weapViewGap;
 	vec2_t		viewMult;
 	float		maxGapDist;
+	float		deadZone;
 	float		dist;
 	//zcm
 
@@ -507,7 +508,6 @@ typedef enum {
 	EV_TAUNT_GETFLAG,
 	EV_TAUNT_GUARDBASE,
 	EV_TAUNT_PATROL
-
 } entity_event_t;
 
 

@@ -600,6 +600,21 @@ float LerpAngle (float from, float to, float frac) {
 }
 
 
+///* //zcm
+//===============
+//LerpPosition
+//===============
+//I don't really want this here. Why doesn't it work in qmath? Is there more than one qmath?
+//*/
+//float LerpPosition (float from, float to, float frac) {
+//	float	a;
+//
+//	a = from + frac * (to - from);
+//
+//	return a;
+//}
+
+
 /*
 =================
 AngleSubtract

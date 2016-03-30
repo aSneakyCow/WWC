@@ -491,9 +491,13 @@ void SetClientViewAngle( gentity_t *ent, vec3_t angle ) {
 	VectorCopy( angle, ent->s.angles );
 	VectorCopy (ent->s.angles, ent->client->ps.viewangles);
 
-	ent->client->ps.weaponOffset[0] = 0;
+	ent->client->ps.weaponOffset[0] = 5;
 	ent->client->ps.weaponOffset[1] = 0;
-	ent->client->ps.weaponOffset[2] = -15; //zcm
+	ent->client->ps.weaponOffset[2] = -30; //zcm
+
+	//ent->client->ps.weaponAngles[0] = 100;
+	//ent->client->ps.weaponAngles[1] = 100;
+	//ent->client->ps.weaponAngles[2] = 100; //zcm
 
 	VectorCopy ( ent->client->ps.viewangles, ent->client->ps.weaponAngles);
 }

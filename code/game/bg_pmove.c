@@ -986,6 +986,7 @@ static int PM_FootstepForSurface( void ) {
 }
 
 
+
 /*
 =================
 PM_CrashLand
@@ -1546,7 +1547,7 @@ static void PM_BeginWeaponChange( int weapon ) {
 	PM_AddEvent( EV_CHANGE_WEAPON );
 	pm->ps->weaponstate = WEAPON_DROPPING;
 	pm->ps->weaponTime += 200;
-	PM_StartTorsoAnim( TORSO_DROP );
+	//PM_StartTorsoAnim( TORSO_DROP );
 }
 
 
@@ -1570,7 +1571,7 @@ static void PM_FinishWeaponChange( void ) {
 	pm->ps->weapon = weapon;
 	pm->ps->weaponstate = WEAPON_RAISING;
 	pm->ps->weaponTime += 250;
-	PM_StartTorsoAnim( TORSO_RAISE );
+	//PM_StartTorsoAnim( TORSO_RAISE );
 }
 
 
@@ -1850,6 +1851,15 @@ static void PM_DropTimers( void ) {
 	}
 }
 
+
+//I don't really want this here. Why doesn't it work in qmath? Is there more than one qmath?
+float LerpPosition (float from, float to, float frac) {
+	float	a;
+	a = from + frac * (to - from);
+	return a;
+}
+
+
 /*
 ================
 PM_UpdateViewAngles
@@ -1861,26 +1871,37 @@ are being updated isntead of a full move
 void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	short		temp[2];
 	int			i;
-	float		maxGapDist, freeAimDist, deadZone, zoomMult;
+	float		freeAimDist;
 	vec3_t		maxPos;
 	vec3_t		minPos;
-	int			weaponReset;
-	int			quad;
-	vec_t		viewReset[2];
-	//if you have fov 90 set and move your gun so half of it is off the screen, dist will be 45
+	vec3_t		tempSightsOffset;
+	vec3_t		baseWeapOffset;
+
 
 	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPINTERMISSION)  return;		// no view changes at all
 	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 )	return;  
 	
-	maxGapDist = 90;
+	pm->maxGapDist = 90;
 
-	if(ps->pm_weapFlags & PMF_ZOOM){
-		maxGapDist = 0;
+	if(ps->pm_weapFlags & PMF_WEAPONUP){
+		//pm->maxGapDist = 0;
+		//pm->maxGapDist = 0;
+		//freeAimDist = 0;
+	} else {
+		freeAimDist = pm->maxGapDist/6;
 	}
 
-	freeAimDist = maxGapDist/6;
+	//sights
+	tempSightsOffset[0] = 7.5;
+	tempSightsOffset[1] = -.2;
+	tempSightsOffset[2] = -6;
 
-	//the endgoal is to create a curved 3D space that represents the bounds of where you can place your onscreen itemw/weappon
+	//hip
+	baseWeapOffset[0] = -3;
+	baseWeapOffset[1] = 0;
+	baseWeapOffset[2] = -12;
+
+	//the endgoal is to create a curved 3D space rather than a boxthat represents the bounds of where you can place your onscreen itemw/weappon
 	minPos[0] = 1;	//maximum forward and back.
 	maxPos[0] = -5;
 
@@ -1888,8 +1909,7 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	maxPos[1] = 12;
 
 	minPos[2] = -20; //maximum up or down on screen
-	maxPos[2] = -10; 
-
+	maxPos[2] = -12; 
 
 //weapon rotation
 	for (i=0 ; i<2 ; i++) {		
@@ -1904,36 +1924,38 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		pm->weapViewGap[i] = ps->weaponAngles[i] - ps->viewangles[i];
 		pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i]))));
 
-		if(maxGapDist != 0){
-			pm->viewMult[i] = pm->weapViewGap[i]/maxGapDist;
+		if(pm->maxGapDist != 0){
+			pm->viewMult[i] = pm->weapViewGap[i]/pm->maxGapDist;
 		} else {
-			pm->viewMult[i] = .75;
+			pm->viewMult[i] = .7;
 		}
 
 		pm->viewMult[i] = fabs(pm->viewMult[i]);
 		if (pm->viewMult[i] > 1 ) pm->viewMult[i] = 1;
 	} 
 	
-	Com_Printf("%f ", pm->viewMult[0] );
-	Com_Printf("%f \n", pm->viewMult[1] );
-	
-	pm->dist = sqrt(fabs((pm->weapViewGap[0] * pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1])));
 	//dist represents the gap between the weapon and the edge of the view frustrum if fov is 90, dist will be 45 if weapon is halfway off edge of screen
+	pm->dist = sqrt(fabs((pm->weapViewGap[0] * pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1])));
 
-	if (pm->dist > freeAimDist){ 
-		for (i=0 ; i<2 ; i++) {
-			deadZone = pm->viewMult[i] * pm->viewMult[i] *pm->weapViewGap[i];
-			ps->viewangles[i] = ps->viewangles[i] + deadZone;
+	//this kind of makes a triangle between the weapon and the gun once its gets past freeaim distance, then snaps it back
+	//should have taken a hint from playerAngles in cg_players and LerpAngle in qmath the 3rd person model does this when rotating
+	for (i=0 ; i<2 ; i++) {
+		if(ps->pm_weapFlags & PMF_WEAPONUP){
+			pm->deadZone = (.75 * pm->viewMult[i] ) * pm->weapViewGap[i]; //this is not perfect. needs to move smoother. the else if and difference in algorithms makes a weird jerk when unzoomed
+			ps->viewangles[i] = ps->viewangles[i] + pm->deadZone;
+		} else 	if (pm->dist > freeAimDist) {
+			//Com_Printf("dist: %f \n", pm->dist );
+			pm->deadZone = pm->viewMult[i] * pm->viewMult[i] *pm->weapViewGap[i];
+			ps->viewangles[i] = ps->viewangles[i] + pm->deadZone;
 		}
-	} else {
 	}
 
 //weapon translation
-	//check that projectile is coming from weapon origin and not screen origin offset instead of the screen
+	//projectile is offset from the front of the screen, change it
 	ps->weaponAngles[2] = 0;
 
 	if (ps->pm_weapFlags & PMF_WEAPONLEFT)	ps->weaponOffset[1] -= .1; 
-	if (ps->pm_weapFlags & PMF_WEAPONRIGHT) ps->weaponOffset[1] += .1; 
+	if (ps->pm_weapFlags & PMF_WEAPONRIGHT) ps->weaponOffset[1] += .1;  /*ps->weaponOffset[0] += .1;  ps->weaponOffset[1] += .1; */
 
 	if((ps->pm_weapFlags & PMF_WEAPONLEFT) && (ps->pm_weapFlags & PMF_WEAPONRIGHT)){
 		ps->pm_weapFlags &= ~PMF_WEAPONLEFT;
@@ -1941,6 +1963,22 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		if(fabs(ps->weaponOffset[1]) > 0){
 		} else if (fabs(ps->weaponOffset[1]) < 0) {
 		}
+	}
+	
+	if(ps->pm_weapFlags & PMF_WEAPONUP){
+		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], tempSightsOffset[0], .05);
+		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], tempSightsOffset[1], .05);
+		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], tempSightsOffset[2], .05);
+
+		ps->zoomed = 1;
+		//PM_AddEvent( PM_ZoomForWeapon() );
+
+	} else {
+		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], baseWeapOffset[0], .05);
+		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], baseWeapOffset[1], .05);
+		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], baseWeapOffset[2], .05);
+		ps->zoomed = 0;
+		//PM_AddEvent( PM_UnZoomForWeapon()); //hmm, this should not be running every frame;
 	}
 
 	if(ps->weaponOffset[1] < minPos[1]){
@@ -1951,7 +1989,8 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	if(ps->weaponOffset[1] > maxPos[1]){
 		ps->pm_weapFlags &= ~PMF_WEAPONRIGHT;
 		ps->weaponOffset[1] = maxPos[1];
-	} 
+	}
+
 }
 
 static void PM_ArticulateWeapon(vec3_t angles) {
@@ -1991,7 +2030,7 @@ static void PM_ArticulateWeapon(vec3_t angles) {
 //DOESN'T WORK RIGHT NOW.
 
 
-	//the beginning stage of deadzone aiming
+	//the beginning stage of pm->deadZone aiming
 
 	// DROP THE WEAPON WHEN LANDING //DON'T DO THESE YET DO THEM LATER PLEASE
 	//CAUSE IT'S COOL

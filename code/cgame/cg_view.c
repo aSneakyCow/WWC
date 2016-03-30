@@ -895,4 +895,12 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		CG_Printf( "cg.clientFrame:%i\n", cg.clientFrame );
 	}
 
+	if(cg.predictedPlayerState.zoomed){ //zcm
+		CG_ZoomDown_f();
+	} else {
+		CG_ZoomUp_f();
+	}
+	//cg.snap;
+	//cg.nextSnap;
+
 }
