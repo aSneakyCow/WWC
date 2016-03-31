@@ -1159,10 +1159,16 @@ netField_t	playerStateFields[] =
 { PSF(grapplePoint[0]), 0 },
 { PSF(grapplePoint[1]), 0 },
 { PSF(grapplePoint[2]), 0 },
+{ PSF(sprintSpeedFwd), 0 },
+{ PSF(sprintSpeedSide), 0 },
+{ PSF(sprintSpeedRear), 0 },
 { PSF(jumppad_ent), 10 },
+{ PSF(weapLerpFrac), 0 },
 { PSF(loopSound), 16 }
 };
-
+	int			g_sprintSpeedFwd;
+	int			g_sprintSpeedSide;
+	int			g_sprintSpeedRear;
 /*
 =============
 MSG_WriteDeltaPlayerstate

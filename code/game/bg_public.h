@@ -148,7 +148,7 @@ typedef enum {
 // pmove->pm_flags
 #define	PMF_DUCKED			1
 #define	PMF_JUMP_HELD		2
-#define	PMF_SPRINT			4		//replace with sprint later
+#define	PMF_SPRINT			4		
 #define	PMF_BACKWARDS_JUMP	8		// go into backwards land
 #define	PMF_BACKWARDS_RUN	16		// coast down to backwards run
 #define	PMF_TIME_LAND		32		// pm_time is time before rejump
@@ -164,8 +164,8 @@ typedef enum {
 
 // pmove->pm_weapFlags
 #define PMF_WEAPONRIGHT			1	// zcm
-#define PMF_WEAPONLEFT			2	// zcm
-#define PMF_WEAPONUP		4	// zcm
+#define PMF_WEAPONLEFT			2
+#define PMF_WEAPONUP		4
 
 
 
@@ -214,8 +214,7 @@ typedef struct {
 	vec3_t		mins, maxs;			// bounding box size
 
 	//zcm
-	playerBox	body;				//zcm
-	vec3_t		oldViewAng;
+	playerBox	body;				//zcm 
 	vec2_t		weapViewGap;
 	vec2_t		viewMult;
 	float		maxGapDist;

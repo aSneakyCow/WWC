@@ -45,6 +45,10 @@ float	pm_waterfriction = 1.0f;
 float	pm_flightfriction = 3.0f;
 float	pm_spectatorfriction = 5.0f;
 
+float	pm_sprintSpeedForward;
+float	pm_sprintSpeedSide;
+float	pm_sprintSpeedBack;
+
 int		c_pmove = 0;
 
 
@@ -305,7 +309,7 @@ static float PM_CmdScale( usercmd_t *cmd ) {
 	if ( !max ) {
 		return 0;
 	}
-
+	
 	total = sqrt( cmd->forwardmove * cmd->forwardmove
 		+ cmd->rightmove * cmd->rightmove + cmd->upmove * cmd->upmove );
 	scale = (float)pm->ps->speed * max / ( 127.0 * total );
@@ -1851,15 +1855,14 @@ static void PM_DropTimers( void ) {
 	}
 }
 
-
 //I don't really want this here. Why doesn't it work in qmath? Is there more than one qmath?
+//put this in qshared with lerpangle to get it to work
 float LerpPosition (float from, float to, float frac) {
 	float	a;
 	a = from + frac * (to - from);
 	return a;
 }
-
-
+ 
 /*
 ================
 PM_UpdateViewAngles
@@ -1868,6 +1871,7 @@ This can be used as another entry point when only the viewangles
 are being updated isntead of a full move
 ================
 */
+
 void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	short		temp[2];
 	int			i;
@@ -1876,7 +1880,10 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	vec3_t		minPos;
 	vec3_t		tempSightsOffset;
 	vec3_t		baseWeapOffset;
-
+	vec3_t		sprintWeapAngle;
+	vec3_t		sprintRocketJumpAngle;
+	vec3_t		sprintWeapOffset;
+	
 
 	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPINTERMISSION)  return;		// no view changes at all
 	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 )	return;  
@@ -1888,8 +1895,23 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		//pm->maxGapDist = 0;
 		//freeAimDist = 0;
 	} else {
-		freeAimDist = pm->maxGapDist/6;
+		//freeAimDist = pm->maxGapDist/6;
 	}
+
+	//sprint
+	sprintWeapOffset[0] = 10;
+	sprintWeapOffset[1] = 30;
+	sprintWeapOffset[2] = -12;
+
+	//sprint rj angle for when looking up and sprinting
+	sprintRocketJumpAngle[0]; //should point directly under player origin
+	sprintRocketJumpAngle[1]; 
+	sprintRocketJumpAngle[2];
+
+	//sprint
+	sprintWeapAngle[0] = 20;
+	sprintWeapAngle[1] = 60;
+	sprintWeapAngle[2] = 20;
 
 	//sights
 	tempSightsOffset[0] = 7.5;
@@ -1915,33 +1937,73 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	for (i=0 ; i<2 ; i++) {		
 		temp[i] = cmd->angles[i] + ps->delta_angles[i];
 
-		if((ps->pm_flags & PMF_RESPAWNED) && pm->ps->pm_type != PM_DEAD  ){
+		if(((ps->pm_flags & PMF_RESPAWNED) || (ps->pm_flags & PMF_SPRINT)) && (pm->ps->pm_type != PM_DEAD)){
 			ps->viewangles[i] = SHORT2ANGLE(temp[i]);//have the viewangles follow the view for the first frame after respawning
 			ps->weaponAngles[i] = ps->viewangles[i];
+			
+
+			ps->pm_weapFlags &= ~PMF_WEAPONUP;
+			ps->zoomed = 0;
 		} else {
 			ps->weaponAngles[i] =  SHORT2ANGLE(temp[i]);
-		}
-		pm->weapViewGap[i] = ps->weaponAngles[i] - ps->viewangles[i];
-		pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i]))));
+			pm->weapViewGap[i] = ps->weaponAngles[i] - ps->viewangles[i];
+			pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i]))));
 
-		if(pm->maxGapDist != 0){
-			pm->viewMult[i] = pm->weapViewGap[i]/pm->maxGapDist;
-		} else {
-			pm->viewMult[i] = .7;
-		}
+			if(pm->maxGapDist != 0){
+				pm->viewMult[i] = pm->weapViewGap[i]/pm->maxGapDist;
+			} else {
+				pm->viewMult[i] = .9;
+			}
 
-		pm->viewMult[i] = fabs(pm->viewMult[i]);
-		if (pm->viewMult[i] > 1 ) pm->viewMult[i] = 1;
+
+			pm->viewMult[i] = fabs(pm->viewMult[i]);
+			if (pm->viewMult[i] > 1 ) pm->viewMult[i] = 1;
+		}
 	} 
 	
 	//dist represents the gap between the weapon and the edge of the view frustrum if fov is 90, dist will be 45 if weapon is halfway off edge of screen
 	pm->dist = sqrt(fabs((pm->weapViewGap[0] * pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1])));
 
+	if(ps->pm_flags & PMF_SPRINT){
+		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], sprintWeapOffset[0], .05);
+		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], sprintWeapOffset[1], .05);
+		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], sprintWeapOffset[2], .05);
+
+		ps->weapLerpFrac = LerpPosition( ps->weapLerpFrac, 1, .05); //since I haven't figured out how to use learpAngleRight yet
+
+		//ps->weaponAngles[0] += fabs(ps->viewangles[0])/* * fabs(ps->viewangles[0])/90*/;
+		//ps->weaponAngles[1] += ps->viewangles[1];
+		//ps->weaponAngles[2] += ps->viewangles[2];
+ 
+		//VectorAdd(ps->viewangles, ps->weaponAngles, ps->weaponAngles);
+	} else {
+		if( ps->weapLerpFrac != 0){
+			ps->weapLerpFrac = LerpPosition( ps->weapLerpFrac, 0, .05);
+		} 
+	}
+
+	ps->weaponAngles[0] = LerpAngle( ps->weaponAngles[0], sprintWeapAngle[0], ps->weapLerpFrac);
+	ps->weaponAngles[1] = LerpAngle( ps->weaponAngles[1], sprintWeapAngle[1] + ps->viewangles[1], ps->weapLerpFrac);
+	ps->weaponAngles[2] = LerpAngle( ps->weaponAngles[2], sprintWeapAngle[2] + ps->viewangles[2], ps->weapLerpFrac);
+
+	if (ps->pm_weapFlags & PMF_WEAPONUP){
+		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], tempSightsOffset[0], .05);
+		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], tempSightsOffset[1], .05);
+		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], tempSightsOffset[2], .05);
+
+		ps->zoomed = 1;
+	} else {
+		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], baseWeapOffset[0], .05);
+		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], baseWeapOffset[1], .05);
+		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], baseWeapOffset[2], .05);
+		ps->zoomed = 0;
+	}
+
 	//this kind of makes a triangle between the weapon and the gun once its gets past freeaim distance, then snaps it back
 	//should have taken a hint from playerAngles in cg_players and LerpAngle in qmath the 3rd person model does this when rotating
 	for (i=0 ; i<2 ; i++) {
 		if(ps->pm_weapFlags & PMF_WEAPONUP){
-			pm->deadZone = (.75 * pm->viewMult[i] ) * pm->weapViewGap[i]; //this is not perfect. needs to move smoother. the else if and difference in algorithms makes a weird jerk when unzoomed
+			pm->deadZone = (3 * pm->viewMult[i] ) * pm->weapViewGap[i]; //this is not perfect. needs to move smoother. the else if and difference in algorithms makes a weird jerk when unzoomed
 			ps->viewangles[i] = ps->viewangles[i] + pm->deadZone;
 		} else 	if (pm->dist > freeAimDist) {
 			//Com_Printf("dist: %f \n", pm->dist );
@@ -1952,7 +2014,6 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 
 //weapon translation
 	//projectile is offset from the front of the screen, change it
-	ps->weaponAngles[2] = 0;
 
 	if (ps->pm_weapFlags & PMF_WEAPONLEFT)	ps->weaponOffset[1] -= .1; 
 	if (ps->pm_weapFlags & PMF_WEAPONRIGHT) ps->weaponOffset[1] += .1;  /*ps->weaponOffset[0] += .1;  ps->weaponOffset[1] += .1; */
@@ -1964,22 +2025,6 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		} else if (fabs(ps->weaponOffset[1]) < 0) {
 		}
 	}
-	
-	if(ps->pm_weapFlags & PMF_WEAPONUP){
-		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], tempSightsOffset[0], .05);
-		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], tempSightsOffset[1], .05);
-		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], tempSightsOffset[2], .05);
-
-		ps->zoomed = 1;
-		//PM_AddEvent( PM_ZoomForWeapon() );
-
-	} else {
-		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], baseWeapOffset[0], .05);
-		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], baseWeapOffset[1], .05);
-		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], baseWeapOffset[2], .05);
-		ps->zoomed = 0;
-		//PM_AddEvent( PM_UnZoomForWeapon()); //hmm, this should not be running every frame;
-	}
 
 	if(ps->weaponOffset[1] < minPos[1]){
 		ps->pm_weapFlags &= ~PMF_WEAPONLEFT;
@@ -1990,6 +2035,7 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		ps->pm_weapFlags &= ~PMF_WEAPONRIGHT;
 		ps->weaponOffset[1] = maxPos[1];
 	}
+	ps->weaponAngles[2] = 0;
 
 }
 
@@ -2055,7 +2101,7 @@ static void PM_ArticulateWeapon(vec3_t angles) {
 	// idle drift
 	//if(pm->cmd.buttons & BUTTON_ATTACK ){ //need to do a lot to get zoom to work
 		spreadfrac = 5 + (flatSpeed/50);
-              
+			  
 		//rand()%90 doesn't work perfeclty for making all players on server different
 		phase = (pm->cmd.serverTime) / 1000.0 * SWAY_PITCH_FREQUENCY * M_PI * 2;
 		angles[PITCH] += SWAY_PITCH_AMPLITUDE * sin( phase ) * ( spreadfrac + SWAY_PITCH_MIN_AMPLITUDE );
@@ -2151,7 +2197,11 @@ void PmoveSingle (pmove_t *pmove) {
 
 	// update the viewangles 
 	PM_UpdateViewAngles( pm->ps, &pm->cmd );
-	AngleVectors (pm->ps->weaponAngles, pml.forward, pml.right, pml.up);
+	if(pm->ps->pm_weapFlags & PMF_SPRINT){
+		AngleVectors (pm->ps->weaponAngles, pml.forward, pml.right, pml.up);	
+	} else {
+		AngleVectors (pm->ps->viewangles, pml.forward, pml.right, pml.up);	
+	}
 	//NEEDs to be handled differently. idle anim shouldn't play while moving, aiming, or airborne
 	//PM_ArticulateWeapon(pm->ps->weaponAngles);
 

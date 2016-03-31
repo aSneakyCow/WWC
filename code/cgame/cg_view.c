@@ -505,14 +505,14 @@ static int CG_CalcFov( void ) {
 		}
 
 		if ( cg.zoomed ) {
-			f = ( cg.time - cg.zoomTime ) / (float)ZOOM_TIME;
+			f = ( cg.time - cg.zoomTime ) / (float)ZOOM_TIME/2;
 			if ( f > 1.0 ) {
 				fov_x = zoomFov;
 			} else {
 				fov_x = fov_x + f * ( zoomFov - fov_x );
 			}
 		} else {
-			f = ( cg.time - cg.zoomTime ) / (float)ZOOM_TIME;
+			f = ( cg.time - cg.zoomTime ) / (float)ZOOM_TIME/2;
 			if ( f > 1.0 ) {
 				fov_x = fov_x;
 			} else {
