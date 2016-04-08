@@ -798,7 +798,7 @@ set muzzle location relative to pivoting eye
 void CalcMuzzlePointOrigin ( gentity_t *ent, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint ) {
 	VectorCopy( ent->s.pos.trBase, muzzlePoint ); //position
 
-	muzzlePoint[2] += ent->client->ps.viewPos[1];
+	muzzlePoint[2] += ent->client->ps.viewPos[1];	//because the weapon rotates around the view in reality when it should not
 
 	// VectorMA(v,s,b,o) - make b s units long, add to v, result in o 
 	VectorMA( muzzlePoint, 0, forward, muzzlePoint );

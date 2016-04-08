@@ -1604,15 +1604,15 @@ void Cmd_Player_Sprint( gentity_t *ent ) {
 }
 
 void Cmd_Player_Zoomin( gentity_t *ent ) {
-	ent->client->ps.pm_weapFlags ^= PMF_WEAPONUP;
+	ent->client->ps.pm_weapFlags ^= PWF_WEAPONUP;
 }
 
 void Cmd_Weapon_Right( gentity_t *ent ) {
-	ent->client->ps.pm_weapFlags ^= PMF_WEAPONRIGHT;
+	ent->client->ps.pm_weapFlags ^= PWF_WEAPONRIGHT;
 }
 
 void Cmd_Weapon_Left( gentity_t *ent ) { //zcm
-	ent->client->ps.pm_weapFlags ^= PMF_WEAPONLEFT;
+	ent->client->ps.pm_weapFlags ^= PWF_WEAPONLEFT;
 }
 
 /*

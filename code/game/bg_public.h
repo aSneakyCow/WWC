@@ -161,14 +161,10 @@ typedef enum {
 #define PMF_SCOREBOARD		8192	// spectate as a scoreboard
 #define PMF_INVULEXPAND		16384	// invulnerability sphere set to full size
 
-
-// pmove->pm_weapFlags
-#define PMF_WEAPONRIGHT			1	// zcm
-#define PMF_WEAPONLEFT			2
-#define PMF_WEAPONUP		4
-
-
-
+// ps->pm_weapFlags
+#define PWF_WEAPONRIGHT			1	// zcm
+#define PWF_WEAPONLEFT			2
+#define PWF_WEAPONUP		4
 
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
 
@@ -216,9 +212,6 @@ typedef struct {
 	//zcm
 	playerBox	body;				//zcm 
 	vec2_t		weapViewGap;
-	vec2_t		viewMult;
-	float		maxGapDist;
-	float		deadZone;
 	float		dist;
 	//zcm
 

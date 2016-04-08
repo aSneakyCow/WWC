@@ -1164,7 +1164,10 @@ netField_t	playerStateFields[] =
 { PSF(sprintSpeedRear), 0 },
 { PSF(jumppad_ent), 10 },
 { PSF(weapLerpFrac), 0 },
-{ PSF(loopSound), 16 }
+{ PSF(viewLerpFrac), 0 },
+{ PSF(gapLerp), 0 },
+{ PSF(loopSound), 16 },
+{ PSF(hand), 8 }
 };
 	int			g_sprintSpeedFwd;
 	int			g_sprintSpeedSide;
