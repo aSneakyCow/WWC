@@ -457,7 +457,8 @@ static qboolean PM_CheckJump( void ) {
 		//if you are moving the angle you need to leap at should be lowered until it hits 45
 
 	if(pm->ps->pm_flags & PMF_SPRINT){
-		pm->ps->velocity[2] = JUMP_VELOCITY + leapMult * MAX_LEAP_VELOCITY;
+		//pm->ps->velocity[2] = JUMP_VELOCITY + leapMult * MAX_LEAP_VELOCITY;
+		pm->ps->velocity[2] = JUMP_VELOCITY;
 		PM_AddEvent( EV_JUMP );
 	} else {
 		pm->ps->velocity[2] = RUN_HEIGHT;
@@ -1900,6 +1901,7 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	int			hand;
 	int			shortTotal = 65535;
 	short		shortGap;
+	float			delta;
 	vec3_t		weapOffsBlend = {0, 0, 0};
 	vec3_t		weapAngBlend = {0, 0, 0};
 	vec3_t		viewAngBlend = {0, 0, 0};
@@ -1929,7 +1931,7 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 //what happens first? get cmd angles determine where they go? The view? Or weapon?
 //Modify deadzone based on which angle is being followed
 //Give angle and position offsets to movement type
-//Apply offsets 
+//Apply offsets (left hand/right hand, viewangle conditionals
 
 	if((ps->pm_flags & PMF_RESPAWNED)){			//the whole else block should be put in a function for later use with vehicles for instance
 		VectorCopy(viewAngBlend, weapAngBlend);		//weapon should really start off pointing towards the center and downwards
@@ -1943,7 +1945,7 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 			} else if (ps->pm_weapFlags & PWF_WEAPONUP) {
 				ps->gapLerp = LerpPositionSq( ps->gapLerp, 1, .35);
 			} else {
-				ps->gapLerp = LerpPositionSq( ps->gapLerp, 20, .25);
+				ps->gapLerp = LerpPositionSq( ps->gapLerp, 15, .25);
 			}
 
 			shortGap = ANGLE2SHORT(ps->gapLerp );
@@ -1969,19 +1971,40 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 			} else {
 				continuousAngle = parent;
 			}
+
+			if(ps->delta_angles[i] >= (shortTotal/2) +1){
+				ps->delta_angles[i] = -(shortTotal+1) + ps->delta_angles[i];
+			}
+
+			//Com_Printf("child: %i ", child );
+			//Com_Printf("parent: %i ", parent );
+			//Com_Printf("delt: %f ", (parent - ps->delta_angles[i]) * .1);
+			delta = SHORT2ANGLE(parent - ps->delta_angles[i]) ;
+
 			//freeaim
 			if ( child < continuousAngle - shortGap) {
 				child = continuousAngle - shortGap;
 			} else if ( child > continuousAngle + shortGap) {
 				child = continuousAngle + shortGap;
+			} else {
+				if(delta < 0){
+
+				} else if  (delta > 0){
+
+				}
 			}
+
+			Com_Printf("\n");
 
 			weapAngBlend[i] = SHORT2ANGLE( parent );
 			viewAngBlend[i] = SHORT2ANGLE( child );
 
 			pm->weapViewGap[i] = weapAngBlend[i] - viewAngBlend[i];
 			pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i])))); 
+			ps->delta_angles[i] = parent;
+			ps->delta_angles[i] = cmd->angles[i];
 		}
+		Com_Printf("\n");
 	}
 
 	pm->dist = sqrt(fabs((pm->weapViewGap[0] * pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1])));
@@ -2031,9 +2054,9 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		ps->weapLerpFrac = LerpPositionSq( ps->weapLerpFrac, 1, .25);
 
 		if(pm->dist >= ps->gapLerp/2){
-			ps->viewLerpFrac = LerpPositionSq( ps->viewLerpFrac, .5, .4);
+			ps->viewLerpFrac = LerpPositionSq( ps->viewLerpFrac, .4, 1);
 		} else {
-			ps->viewLerpFrac = LerpPositionSq( ps->viewLerpFrac, .1, .5); 
+			ps->viewLerpFrac = LerpPositionSq( ps->viewLerpFrac, .1, .1); 
 		}
 
 		if(fabs(ps->weaponOffset[2] -tempSightsOffset[2]) < .01){
@@ -2120,71 +2143,6 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	ps->viewangles[2] = 0;
 }
 
-//
-//void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
-//	short		temp;
-//	short		temp2;
-//	int			temp3;
-//	float		angle;
-//	int		i;
-//	int gap = ANGLE2SHORT(20);
-//
-//	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPINTERMISSION) {
-//		return;		// no view changes at all
-//	}
-//
-//	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 ) {
-//		return;		// no view changes at all
-//	}
-//
-//	if((ps->pm_flags & PMF_RESPAWNED)){
-//		VectorCopy(ps->viewangles, ps->weaponAngles);
-//	} else {
-//		for (i=0 ; i<2 ; i++) {
-//			temp = cmd->angles[i];
-//			temp2 = ANGLE2SHORT(ps->viewangles[i]);
-//
-//			if(temp - temp2 > 32768){
-//			
-//			} else {
-//
-//			}
-//			
-//			if(temp >= 0 && temp2 < 0){ //checks the -32768, 0, 32768
-//				if(abs(temp - temp2) > 32768){ //because it wont loop at -1, 0, 1
-//					temp3 =  -65536 + temp;  
-//				} else {
-//					temp3 = temp;
-//				}
-//				if ( temp2 < temp3- gap) {
-//					temp2 = temp3 - gap;
-//				}
-//			} else  if(temp < 0 && temp2 >= 0){
-//				if(abs(temp - temp2) > 32768){ //because it wont loop at -1, 0, 1
-//					temp3 =  65535 + temp;
-//				} else {
-//					temp3 = temp;
-//				}
-//				if ( temp2 > temp3 + gap) {
-//					temp2 = temp3 + gap;
-//				}
-//			} else {
-//				temp3 = temp;
-//			}
-//
-//			if ( temp2 < temp3 - gap) {
-//				temp2 = temp3 - gap;
-//			} else if ( temp2 > temp3 + gap) {
-//				temp2 = temp3 + gap;
-//			}
-//
-//			ps->weaponAngles[i] = SHORT2ANGLE( temp );
-//			ps->viewangles[i] = SHORT2ANGLE(temp2);
-//		}
-//		ps->weaponAngles[2] = 0;
-//		ps->viewangles[2] = 0;
-//	}
-//}
 
 static void PM_ArticulateWeapon(vec3_t angles) {
 	float	scale;
