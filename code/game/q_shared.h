@@ -1227,9 +1227,6 @@ typedef struct playerState_s {
 	int			jumppad_frame;
 	int			entityEventSequence;
 	float		weapLerpFrac; //since I can't figure out how to do the angle lerp the same way as position lerp
-	float		viewLerpFrac; 
-	float		gapLerp;
-	int hand;
 } playerState_t;
 
 
