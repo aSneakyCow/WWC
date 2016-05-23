@@ -45,21 +45,12 @@ float	pm_waterfriction = 1.0f;
 float	pm_flightfriction = 3.0f;
 float	pm_spectatorfriction = 5.0f;
 
-float	pm_sprintSpeedForward; //zcm
+float	pm_sprintSpeedForward;
 float	pm_sprintSpeedSide;
 float	pm_sprintSpeedBack;
 
-//the endgoal is to create a curved 3D space rather than a boxthat represents the bounds of where you can place your onscreen itemw/weappon
-vec3_t	maxWeapPos = { -5, 12, -12};
-vec3_t	minWeapPos = { 1, -12, -20};
-
-vec3_t	tempSightsOffset = { 7.5, -.2, -6};
-vec3_t	baseWeapOffset = { -3, 0, -12};
-vec3_t	sprintWeapAngle = { 20, 60, 20};
-vec3_t	sprintRocketJumpAngle = { 90, 0, 0};//should point directly under player origin
-vec3_t	sprintWeapOffset = { 10, 10, -12};
-
 int		c_pmove = 0;
+
 
 vec3_t traceBody[8]; //zcm
 
@@ -1858,7 +1849,7 @@ static void PM_DropTimers( void ) {
 
 	if ( pm->ps->torsoTimer > 0 ) {
 		pm->ps->torsoTimer -= pml.msec;
-		if ( pm->ps->torsoTimer < 0 ){ 
+		if ( pm->ps->torsoTimer < 0 ) {
 			pm->ps->torsoTimer = 0;
 		}
 	}
@@ -1868,20 +1859,10 @@ static void PM_DropTimers( void ) {
 //put this in qshared with lerpangle to get it to work
 float LerpPosition (float from, float to, float frac) {
 	float	a;
-	a = from + (frac) * (to - from);
+	a = from + frac * (to - from);
 	return a;
 }
-
-float LerpPositionSq (float from, float to, float frac) {
-	float	a;
-	a = from + (frac * frac * frac) * (to - from);
-	return a;
-}
-
-int checkHand(){
-
-}
-
+ 
 /*
 ================
 PM_UpdateViewAngles
@@ -1891,300 +1872,172 @@ are being updated isntead of a full move
 ================
 */
 
-
 void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
-	short		parent;		//angles that contact the bounds and drag the child
-	short		child;		//angles that form the bounds, but follow the parent
-	int			continuousAngle;
+	short		temp[2];
 	int			i;
-	int			hand;
-	int			shortTotal = 65535;
-	short		shortGap;
-	vec3_t		weapOffsBlend = {0, 0, 0};
-	vec3_t		weapAngBlend = {0, 0, 0};
-	vec3_t		viewAngBlend = {0, 0, 0};
-	vec3_t		input = {0,0,0};
+	float		freeAimDist;
+	vec3_t		maxPos;
+	vec3_t		minPos;
+	vec3_t		tempSightsOffset;
+	vec3_t		baseWeapOffset;
+	vec3_t		sprintWeapAngle;
+	vec3_t		sprintRocketJumpAngle;
+	vec3_t		sprintWeapOffset;
+	
 
 	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPINTERMISSION)  return;		// no view changes at all
 	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 )	return;  
 	
-////all the things that would be done regardless of modification should go here to be overwritten, defaults, etc
-	VectorCopy( baseWeapOffset, weapOffsBlend);
-	VectorCopy( ps->viewangles, viewAngBlend);
+	pm->maxGapDist = 90;
 
-	if(!((ps->pm_weapFlags & PWF_WEAPONRIGHT) && (ps->pm_weapFlags & PWF_WEAPONLEFT))){
-		hand = 0;
-
-		if(ps->pm_weapFlags & PWF_WEAPONRIGHT){
-			weapOffsBlend[1] = maxWeapPos[1];
-			hand = 1;
-		}
-	
-		if (ps->pm_weapFlags & PWF_WEAPONLEFT){
-			weapOffsBlend[1] = minWeapPos[1];
-			hand = -1;
-		}
-	}
-	
-//what happens first? get cmd angles determine where they go? The view? Or weapon?
-//Modify deadzone based on which angle is being followed
-//Give angle and position offsets to movement type
-//Apply offsets 
-
-	if((ps->pm_flags & PMF_RESPAWNED)){			//the whole else block should be put in a function for later use with vehicles for instance
-		VectorCopy(viewAngBlend, weapAngBlend);		//weapon should really start off pointing towards the center and downwards
-	} else { 
-		for (i=0 ; i<2 ; i++) {
-			parent = cmd->angles[i];
-			child = ANGLE2SHORT(ps->viewangles[i]);
-
-			if(ps->pm_flags & PMF_SPRINT){ // I'm not satisfied with this. view ang should not snap to input angles	
-				ps->gapLerp = LerpPositionSq( ps->gapLerp, 5, .25);	
-			} else if (ps->pm_weapFlags & PWF_WEAPONUP) {
-				ps->gapLerp = LerpPositionSq( ps->gapLerp, 1, .35);
-			} else {
-				ps->gapLerp = LerpPositionSq( ps->gapLerp, 20, .25);
-			}
-
-			shortGap = ANGLE2SHORT(ps->gapLerp );
-			//make freeaim angles continuous with extremities of the short
-			if(parent >= 0 && child < 0){ //checks the -32768, 0, 32767
-				if(abs(parent - child) > (shortTotal/2) ){ //because it wont loop at -1, 0, 1 with the above check
-					continuousAngle =  -shortTotal + parent;  
-				} else {
-					continuousAngle = parent;
-				}
-				if ( child < continuousAngle- shortGap) {
-					child = continuousAngle - shortGap;
-				}
-			} else  if(parent < 0 && child >= 0){
-				if(abs(parent - child) > (shortTotal/2)){ 
-					continuousAngle =  (shortTotal) + parent;
-				} else {
-					continuousAngle = parent;
-				}
-				if ( child > continuousAngle + shortGap) {
-					child = continuousAngle + shortGap;
-				}
-			} else {
-				continuousAngle = parent;
-			}
-			//freeaim
-			if ( child < continuousAngle - shortGap) {
-				child = continuousAngle - shortGap;
-			} else if ( child > continuousAngle + shortGap) {
-				child = continuousAngle + shortGap;
-			}
-
-			weapAngBlend[i] = SHORT2ANGLE( parent );
-			viewAngBlend[i] = SHORT2ANGLE( child );
-
-			pm->weapViewGap[i] = weapAngBlend[i] - viewAngBlend[i];
-			pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i])))); 
-		}
+	if(ps->pm_weapFlags & PMF_WEAPONUP){
+		//pm->maxGapDist = 0;
+		//pm->maxGapDist = 0;
+		//freeAimDist = 0;
+	} else {
+		//freeAimDist = pm->maxGapDist/6;
 	}
 
+	//sprint
+	sprintWeapOffset[0] = 10;
+	sprintWeapOffset[1] = 30;
+	sprintWeapOffset[2] = -12;
+
+	//sprint rj angle for when looking up and sprinting
+	sprintRocketJumpAngle[0]; //should point directly under player origin
+	sprintRocketJumpAngle[1]; 
+	sprintRocketJumpAngle[2];
+
+	//sprint
+	sprintWeapAngle[0] = 20;
+	sprintWeapAngle[1] = 60;
+	sprintWeapAngle[2] = 20;
+
+	//sights
+	tempSightsOffset[0] = 7.5;
+	tempSightsOffset[1] = -.2;
+	tempSightsOffset[2] = -6;
+
+	//hip
+	baseWeapOffset[0] = -3;
+	baseWeapOffset[1] = 0;
+	baseWeapOffset[2] = -12;
+
+	//the endgoal is to create a curved 3D space rather than a boxthat represents the bounds of where you can place your onscreen itemw/weappon
+	minPos[0] = 1;	//maximum forward and back.
+	maxPos[0] = -5;
+
+	minPos[1] = -12; //maximum left or right on screen
+	maxPos[1] = 12;
+
+	minPos[2] = -20; //maximum up or down on screen
+	maxPos[2] = -12; 
+
+//weapon rotation
+	for (i=0 ; i<2 ; i++) {		
+		temp[i] = cmd->angles[i] + ps->delta_angles[i];
+
+		if(((ps->pm_flags & PMF_RESPAWNED) || (ps->pm_flags & PMF_SPRINT)) && (pm->ps->pm_type != PM_DEAD)){
+			ps->viewangles[i] = SHORT2ANGLE(temp[i]);//have the viewangles follow the view for the first frame after respawning
+			ps->weaponAngles[i] = ps->viewangles[i];
+			
+
+			ps->pm_weapFlags &= ~PMF_WEAPONUP;
+			ps->zoomed = 0;
+		} else {
+			ps->weaponAngles[i] =  SHORT2ANGLE(temp[i]);
+			pm->weapViewGap[i] = ps->weaponAngles[i] - ps->viewangles[i];
+			pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i]))));
+
+			if(pm->maxGapDist != 0){
+				pm->viewMult[i] = pm->weapViewGap[i]/pm->maxGapDist;
+			} else {
+				pm->viewMult[i] = .9;
+			}
+
+
+			pm->viewMult[i] = fabs(pm->viewMult[i]);
+			if (pm->viewMult[i] > 1 ) pm->viewMult[i] = 1;
+		}
+	} 
+	
+	//dist represents the gap between the weapon and the edge of the view frustrum if fov is 90, dist will be 45 if weapon is halfway off edge of screen
 	pm->dist = sqrt(fabs((pm->weapViewGap[0] * pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1])));
 
-	//sprinting
-	if(ps->pm_flags & PMF_SPRINT){ 
-		//while sprinting move to this position and ...
-		VectorCopy( sprintWeapOffset, weapOffsBlend);
+	if(ps->pm_flags & PMF_SPRINT){
+		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], sprintWeapOffset[0], .05);
+		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], sprintWeapOffset[1], .05);
+		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], sprintWeapOffset[2], .05);
 
-		if(!((ps->pm_weapFlags & PWF_WEAPONRIGHT) && (ps->pm_weapFlags & PWF_WEAPONLEFT))){
-			if(hand != 0){
-				if(ps->pm_weapFlags & PWF_WEAPONRIGHT){
-					weapOffsBlend[1] = maxWeapPos[1];
-				} 
-				if (ps->pm_weapFlags & PWF_WEAPONLEFT){
-					weapOffsBlend[1] = minWeapPos[1];
-				}
-			} else {
-				weapOffsBlend[1] = 0;
-				weapOffsBlend[2] = minWeapPos[2] +4;
-			}
-		}
+		ps->weapLerpFrac = LerpPosition( ps->weapLerpFrac, 1, .05); //since I haven't figured out how to use learpAngleRight yet
 
-		//lower weapon to appropriate position
-		if(hand == 0){
-			weapAngBlend[0] = 3 * sprintWeapAngle[0]; 
-		} else {
-			weapAngBlend[0] = sprintWeapAngle[0]; 
-		}
-		weapAngBlend[1] = ( hand * sprintWeapAngle[1]) + viewAngBlend[1];
+		//ps->weaponAngles[0] += fabs(ps->viewangles[0])/* * fabs(ps->viewangles[0])/90*/;
+		//ps->weaponAngles[1] += ps->viewangles[1];
+		//ps->weaponAngles[2] += ps->viewangles[2];
+ 
+		//VectorAdd(ps->viewangles, ps->weaponAngles, ps->weaponAngles);
+	} else {
+		if( ps->weapLerpFrac != 0){
+			ps->weapLerpFrac = LerpPosition( ps->weapLerpFrac, 0, .05);
+		} 
+	}
 
-		//move directions should influence weapon angles, too, so you can sprint but aim in a wobbly 1 handed way
-		ps->weapLerpFrac = LerpPositionSq( ps->weapLerpFrac, .2, 1); //lerpfrac's lerp in/out needs to change depending on the gap between position and sprint position
+	ps->weaponAngles[0] = LerpAngle( ps->weaponAngles[0], sprintWeapAngle[0], ps->weapLerpFrac);
+	ps->weaponAngles[1] = LerpAngle( ps->weaponAngles[1], sprintWeapAngle[1] + ps->viewangles[1], ps->weapLerpFrac);
+	ps->weaponAngles[2] = LerpAngle( ps->weaponAngles[2], sprintWeapAngle[2] + ps->viewangles[2], ps->weapLerpFrac);
 
-		if(pm->dist >= ps->gapLerp/2 && pm->dist < ps->gapLerp){
-			ps->viewLerpFrac = LerpPositionSq( ps->viewLerpFrac, .8, 1);
-		} else {
-			ps->viewLerpFrac = LerpPositionSq( ps->viewLerpFrac, .5, 1); 
-		}
-		
-		ps->pm_weapFlags &= ~PWF_WEAPONUP;
-		ps->zoomed = 0;
-	} else if (ps->pm_weapFlags & PWF_WEAPONUP){
-		//zooming with sights
-		VectorCopy( tempSightsOffset, weapOffsBlend);//raise to sights
+	if (ps->pm_weapFlags & PMF_WEAPONUP){
+		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], tempSightsOffset[0], .05);
+		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], tempSightsOffset[1], .05);
+		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], tempSightsOffset[2], .05);
 
-		ps->weapLerpFrac = LerpPositionSq( ps->weapLerpFrac, 1, .25);
-
-		if(pm->dist >= ps->gapLerp/2){
-			ps->viewLerpFrac = LerpPositionSq( ps->viewLerpFrac, .5, .4);
-		} else {
-			ps->viewLerpFrac = LerpPositionSq( ps->viewLerpFrac, .1, .5); 
-		}
-
-		if(fabs(ps->weaponOffset[2] -tempSightsOffset[2]) < .01){
-			weapOffsBlend[2] = tempSightsOffset[2];
-		}
 		ps->zoomed = 1;
-	} /* else if (ps->pm_weapFlags & PMF_SPRINT) && (ps->pm_weapFlags & PWF_WEAPONUP){//should be a position here for running and having sights. not near same speed as sprinting, but a real stamina eater.
-	}*/ else {	//not sprinting
-		//while exiting sprint raise the weapon...
-		//blend the power of the cmd angles up to 1
-		ps->weapLerpFrac = LerpPositionSq( ps->weapLerpFrac, 1, .25);
-		ps->viewLerpFrac = LerpPositionSq( ps->viewLerpFrac, 1, .25);
-
-		//FAILED
-		//viewAngBlend[0] = LerpAngle( viewAngBlend[0], weapAngBlend[0], .25);
-		//viewAngBlend[1] = LerpAngle( viewAngBlend[1], weapAngBlend[1], .25);
-		//viewAngBlend[2] = LerpAngle( viewAngBlend[2], weapAngBlend[2], .25);
-		//viewAngBlend[0] = .1 * weapAngBlend[0];
-		//viewAngBlend[1] = .1 * weapAngBlend[1];
-		//viewAngBlend[2] = .1 * weapAngBlend[2];
-		//viewAngBlend[0] += pm->weapViewGap[0] * .01;
-		//viewAngBlend[1] += pm->weapViewGap[1] * .01;
-		//viewAngBlend[2] += pm->weapViewGap[2] * .01;
-
-		if(pm->dist <= ps->gapLerp){
-			//weap angles need to be changed by a portion of what changes weapAngles either here or in the first block;
-
-		}
+	} else {
+		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], baseWeapOffset[0], .05);
+		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], baseWeapOffset[1], .05);
+		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], baseWeapOffset[2], .05);
 		ps->zoomed = 0;
 	}
 
-////weapon translation
-//	projectile is offset from the front of the screen, change it
-	
-	if((ps->pm_weapFlags & PWF_WEAPONLEFT) && (ps->pm_weapFlags & PWF_WEAPONRIGHT)){
-		ps->pm_weapFlags &= ~PWF_WEAPONLEFT;
-		ps->pm_weapFlags &= ~PWF_WEAPONRIGHT;
+	//this kind of makes a triangle between the weapon and the gun once its gets past freeaim distance, then snaps it back
+	//should have taken a hint from playerAngles in cg_players and LerpAngle in qmath the 3rd person model does this when rotating
+	for (i=0 ; i<2 ; i++) {
+		if(ps->pm_weapFlags & PMF_WEAPONUP){
+			pm->deadZone = (3 * pm->viewMult[i] ) * pm->weapViewGap[i]; //this is not perfect. needs to move smoother. the else if and difference in algorithms makes a weird jerk when unzoomed
+			ps->viewangles[i] = ps->viewangles[i] + pm->deadZone;
+		} else 	if (pm->dist > freeAimDist) {
+			//Com_Printf("dist: %f \n", pm->dist );
+			pm->deadZone = pm->viewMult[i] * pm->viewMult[i] *pm->weapViewGap[i];
+			ps->viewangles[i] = ps->viewangles[i] + pm->deadZone;
+		}
+	}
+
+//weapon translation
+	//projectile is offset from the front of the screen, change it
+
+	if (ps->pm_weapFlags & PMF_WEAPONLEFT)	ps->weaponOffset[1] -= .1; 
+	if (ps->pm_weapFlags & PMF_WEAPONRIGHT) ps->weaponOffset[1] += .1;  /*ps->weaponOffset[0] += .1;  ps->weaponOffset[1] += .1; */
+
+	if((ps->pm_weapFlags & PMF_WEAPONLEFT) && (ps->pm_weapFlags & PMF_WEAPONRIGHT)){
+		ps->pm_weapFlags &= ~PMF_WEAPONLEFT;
+		ps->pm_weapFlags &= ~PMF_WEAPONRIGHT;
 		if(fabs(ps->weaponOffset[1]) > 0){
 		} else if (fabs(ps->weaponOffset[1]) < 0) {
 		}
 	}
 
-	if(ps->weaponOffset[1] < minWeapPos[1]){
-		ps->pm_weapFlags &= ~PWF_WEAPONLEFT;
-		ps->weaponOffset[1] = minWeapPos[1];
+	if(ps->weaponOffset[1] < minPos[1]){
+		ps->pm_weapFlags &= ~PMF_WEAPONLEFT;
+		ps->weaponOffset[1] = minPos[1];
 	}
 
-	if(ps->weaponOffset[1] > maxWeapPos[1]){
-		ps->pm_weapFlags &= ~PWF_WEAPONRIGHT;
-		ps->weaponOffset[1] = minWeapPos[1];
+	if(ps->weaponOffset[1] > maxPos[1]){
+		ps->pm_weapFlags &= ~PMF_WEAPONRIGHT;
+		ps->weaponOffset[1] = maxPos[1];
 	}
-
-	//modify position offset so you can and decelerate the movement. so it moves until you release when you release it lerps to a certain distance away within the max or min distance.
-	//modify freeaim so that the view movies slightly with the weapon movement
-//Apply offsets 
-	ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], weapOffsBlend[0], .1);
-	ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], weapOffsBlend[1], .1);
-	ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], weapOffsBlend[2], .1);
-	
-	ps->weaponAngles[0] = LerpAngle( ps->weaponAngles[0], weapAngBlend[0], ps->weapLerpFrac);
-	ps->weaponAngles[1] = LerpAngle( ps->weaponAngles[1], weapAngBlend[1], ps->weapLerpFrac);
-	ps->weaponAngles[2] = LerpAngle( ps->weaponAngles[2], weapAngBlend[2], ps->weapLerpFrac);
-
-	ps->viewangles[0] = LerpAngle( ps->viewangles[0], viewAngBlend[0], ps->viewLerpFrac);
-	ps->viewangles[1] = LerpAngle( ps->viewangles[1], viewAngBlend[1], ps->viewLerpFrac);
-	ps->viewangles[2] = LerpAngle( ps->viewangles[2], viewAngBlend[2], ps->viewLerpFrac);
-
-	for(i = 0; i < 3; i++){		//hmm, need to figure out why this is here no hacky fixes please
-		if(ps->viewangles[i] >= 360){
-			ps->viewangles[i] -= 360;
-		}
-		if(ps->viewangles[i] <= -360){
-			ps->viewangles[i] += 360;
-		}
-		if(ps->weaponAngles[i] >= 360){
-			ps->weaponAngles[i] -= 360;
-		}
-		if(ps->weaponAngles[i] <= -360){
-			ps->weaponAngles[i] += 360;
-		}
-	}
-
 	ps->weaponAngles[2] = 0;
-	ps->viewangles[2] = 0;
-}
 
-//
-//void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
-//	short		temp;
-//	short		temp2;
-//	int			temp3;
-//	float		angle;
-//	int		i;
-//	int gap = ANGLE2SHORT(20);
-//
-//	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPINTERMISSION) {
-//		return;		// no view changes at all
-//	}
-//
-//	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 ) {
-//		return;		// no view changes at all
-//	}
-//
-//	if((ps->pm_flags & PMF_RESPAWNED)){
-//		VectorCopy(ps->viewangles, ps->weaponAngles);
-//	} else {
-//		for (i=0 ; i<2 ; i++) {
-//			temp = cmd->angles[i];
-//			temp2 = ANGLE2SHORT(ps->viewangles[i]);
-//
-//			if(temp - temp2 > 32768){
-//			
-//			} else {
-//
-//			}
-//			
-//			if(temp >= 0 && temp2 < 0){ //checks the -32768, 0, 32768
-//				if(abs(temp - temp2) > 32768){ //because it wont loop at -1, 0, 1
-//					temp3 =  -65536 + temp;  
-//				} else {
-//					temp3 = temp;
-//				}
-//				if ( temp2 < temp3- gap) {
-//					temp2 = temp3 - gap;
-//				}
-//			} else  if(temp < 0 && temp2 >= 0){
-//				if(abs(temp - temp2) > 32768){ //because it wont loop at -1, 0, 1
-//					temp3 =  65535 + temp;
-//				} else {
-//					temp3 = temp;
-//				}
-//				if ( temp2 > temp3 + gap) {
-//					temp2 = temp3 + gap;
-//				}
-//			} else {
-//				temp3 = temp;
-//			}
-//
-//			if ( temp2 < temp3 - gap) {
-//				temp2 = temp3 - gap;
-//			} else if ( temp2 > temp3 + gap) {
-//				temp2 = temp3 + gap;
-//			}
-//
-//			ps->weaponAngles[i] = SHORT2ANGLE( temp );
-//			ps->viewangles[i] = SHORT2ANGLE(temp2);
-//		}
-//		ps->weaponAngles[2] = 0;
-//		ps->viewangles[2] = 0;
-//	}
-//}
+}
 
 static void PM_ArticulateWeapon(vec3_t angles) {
 	float	scale;
