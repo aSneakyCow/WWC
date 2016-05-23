@@ -1877,6 +1877,7 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	short		temp[2];
 	int			i;
 <<<<<<< HEAD
+<<<<<<< HEAD
 	int			hand;
 	int			shortTotal = 65535;
 	short		shortGap;
@@ -1886,6 +1887,8 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	vec3_t		viewAngBlend = {0, 0, 0};
 	vec3_t		input = {0,0,0};
 =======
+=======
+>>>>>>> parent of ea9e295... Almost done
 	float		freeAimDist;
 	vec3_t		maxPos;
 	vec3_t		minPos;
@@ -1895,6 +1898,9 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	vec3_t		sprintRocketJumpAngle;
 	vec3_t		sprintWeapOffset;
 	
+<<<<<<< HEAD
+>>>>>>> parent of ea9e295... Almost done
+=======
 >>>>>>> parent of ea9e295... Almost done
 
 	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPINTERMISSION)  return;		// no view changes at all
@@ -1909,6 +1915,7 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	} else {
 		//freeAimDist = pm->maxGapDist/6;
 	}
+<<<<<<< HEAD
 <<<<<<< HEAD
 	
 //what happens first? get cmd angles determine where they go? The view? Or weapon?
@@ -2012,6 +2019,29 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	tempSightsOffset[1] = -.2;
 	tempSightsOffset[2] = -6;
 
+=======
+
+	//sprint
+	sprintWeapOffset[0] = 10;
+	sprintWeapOffset[1] = 30;
+	sprintWeapOffset[2] = -12;
+
+	//sprint rj angle for when looking up and sprinting
+	sprintRocketJumpAngle[0]; //should point directly under player origin
+	sprintRocketJumpAngle[1]; 
+	sprintRocketJumpAngle[2];
+
+	//sprint
+	sprintWeapAngle[0] = 20;
+	sprintWeapAngle[1] = 60;
+	sprintWeapAngle[2] = 20;
+
+	//sights
+	tempSightsOffset[0] = 7.5;
+	tempSightsOffset[1] = -.2;
+	tempSightsOffset[2] = -6;
+
+>>>>>>> parent of ea9e295... Almost done
 	//hip
 	baseWeapOffset[0] = -3;
 	baseWeapOffset[1] = 0;
@@ -2064,6 +2094,7 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], sprintWeapOffset[2], .05);
 
 		ps->weapLerpFrac = LerpPosition( ps->weapLerpFrac, 1, .05); //since I haven't figured out how to use learpAngleRight yet
+<<<<<<< HEAD
 
 		//ps->weaponAngles[0] += fabs(ps->viewangles[0])/* * fabs(ps->viewangles[0])/90*/;
 		//ps->weaponAngles[1] += ps->viewangles[1];
@@ -2076,10 +2107,25 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		} 
 	}
 
+=======
+
+		//ps->weaponAngles[0] += fabs(ps->viewangles[0])/* * fabs(ps->viewangles[0])/90*/;
+		//ps->weaponAngles[1] += ps->viewangles[1];
+		//ps->weaponAngles[2] += ps->viewangles[2];
+ 
+		//VectorAdd(ps->viewangles, ps->weaponAngles, ps->weaponAngles);
+	} else {
+		if( ps->weapLerpFrac != 0){
+			ps->weapLerpFrac = LerpPosition( ps->weapLerpFrac, 0, .05);
+		} 
+	}
+
+>>>>>>> parent of ea9e295... Almost done
 	ps->weaponAngles[0] = LerpAngle( ps->weaponAngles[0], sprintWeapAngle[0], ps->weapLerpFrac);
 	ps->weaponAngles[1] = LerpAngle( ps->weaponAngles[1], sprintWeapAngle[1] + ps->viewangles[1], ps->weapLerpFrac);
 	ps->weaponAngles[2] = LerpAngle( ps->weaponAngles[2], sprintWeapAngle[2] + ps->viewangles[2], ps->weapLerpFrac);
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 		if(pm->dist >= ps->gapLerp/2){
 			ps->viewLerpFrac = LerpPositionSq( ps->viewLerpFrac, .4, 1);
@@ -2087,10 +2133,15 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 			ps->viewLerpFrac = LerpPositionSq( ps->viewLerpFrac, .1, .1); 
 		}
 =======
+=======
+>>>>>>> parent of ea9e295... Almost done
 	if (ps->pm_weapFlags & PMF_WEAPONUP){
 		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], tempSightsOffset[0], .05);
 		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], tempSightsOffset[1], .05);
 		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], tempSightsOffset[2], .05);
+<<<<<<< HEAD
+>>>>>>> parent of ea9e295... Almost done
+=======
 >>>>>>> parent of ea9e295... Almost done
 
 		ps->zoomed = 1;
@@ -2140,6 +2191,10 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 	ps->weaponAngles[2] = 0;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+}
+>>>>>>> parent of ea9e295... Almost done
 =======
 }
 >>>>>>> parent of ea9e295... Almost done
