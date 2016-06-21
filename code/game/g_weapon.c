@@ -796,19 +796,10 @@ set muzzle location relative to pivoting eye
 */
 
 void CalcMuzzlePointOrigin ( gentity_t *ent, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint ) {
-	VectorCopy( ent->s.pos.trBase, muzzlePoint ); //position
+	VectorAdd( ent->s.pos.trBase, ent->client->ps.weaponOffset, muzzlePoint ); //position
 
-	muzzlePoint[2] += ent->client->ps.viewPos[1];
-
-	// VectorMA(v,s,b,o) - make b s units long, add to v, result in o 
-	VectorMA( muzzlePoint, 0, forward, muzzlePoint );
-	VectorMA( muzzlePoint, .5 * ent->client->ps.weaponOffset[1], right, muzzlePoint );
-	VectorMA( muzzlePoint, ent->client->ps.weaponOffset[2] + 10, up, muzzlePoint );
-
-	// snap to integer coordinates for more efficient network bandwidth usage
+	//VectorCopy( ent->client->ps.weaponOffset , muzzlePoint );
 	SnapVector( muzzlePoint );
-	
-	VectorCopy(muzzlePoint, ent->client->ps.weaponOrigin);
 }
 
 
@@ -848,8 +839,11 @@ void FireWeapon( gentity_t *ent ) {
 
 	// set aiming directions
 	//AngleVectors (ent->client->ps.viewangles, forward, right, up);
+
 	AngleVectors (ent->client->ps.weaponAngles, forward, right, up); //zcm
 	CalcMuzzlePointOrigin ( ent, forward, right, up, muzzle );
+
+	//Com_Printf( "%f  %f  %f\n", forward[0], forward[1], forward[2] );
 
 	// fire the specific weapon
 	switch( ent->s.weapon ) {

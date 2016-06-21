@@ -921,7 +921,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 		break;
 
 	case EV_RAILTRAIL:
-		DEBUGNAME("EV_RAILTRAIL");
+		//DEBUGNAME("EV_RAILTRAIL");
 		cent->currentState.weapon = WP_RAILGUN;
 		// if the end was on a nomark surface, don't make an explosion
 		CG_RailTrail( ci, es->origin2, es->pos.trBase );

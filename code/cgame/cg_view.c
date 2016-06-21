@@ -409,15 +409,15 @@ static void CG_OffsetFirstPersonView( void ) {
 
 
 	// add fall height
-	delta = cg.time - cg.landTime;
-	if ( delta < LAND_DEFLECT_TIME ) {
-		f = delta / LAND_DEFLECT_TIME;
-		cg.refdef.vieworg[2] += cg.landChange * f;
-	} else if ( delta < LAND_DEFLECT_TIME + LAND_RETURN_TIME ) {
-		delta -= LAND_DEFLECT_TIME;
-		f = 1.0 - ( delta / LAND_RETURN_TIME );
-		cg.refdef.vieworg[2] += cg.landChange * f;
-	}
+	//delta = cg.time - cg.landTime;
+	//if ( delta < LAND_DEFLECT_TIME ) {
+	//	f = delta / LAND_DEFLECT_TIME;
+	//	cg.refdef.vieworg[2] += cg.landChange * f;
+	//} else if ( delta < LAND_DEFLECT_TIME + LAND_RETURN_TIME ) {
+	//	delta -= LAND_DEFLECT_TIME;
+	//	f = 1.0 - ( delta / LAND_RETURN_TIME );
+	//	cg.refdef.vieworg[2] += cg.landChange * f;
+	//}
 
 	// add step offset
 	CG_StepOffset();

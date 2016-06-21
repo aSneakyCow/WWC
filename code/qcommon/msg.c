@@ -1114,6 +1114,11 @@ netField_t	playerStateFields[] =
 { PSF(weaponOrigin[1]), 0 },
 { PSF(weaponOffset[0]), 0 },
 { PSF(weaponOffset[1]), 0 },
+{ PSF(oldAngles[0]), 0 },
+{ PSF(oldAngles[1]), 0 },
+{ PSF(dirOverflow[0]), 0 },
+{ PSF(dirOverflow[1]), 0 },
+
 { PSF(module), 0 },
 { PSF(zoomed), 0 },
 { PSF(weaponTime), -16 },
@@ -1163,12 +1168,15 @@ netField_t	playerStateFields[] =
 { PSF(sprintSpeedSide), 0 },
 { PSF(sprintSpeedRear), 0 },
 { PSF(jumppad_ent), 10 },
-{ PSF(weapLerpFrac), 0 },
-{ PSF(loopSound), 16 }
+{ PSF(weapAngLerpFrac), 0 },
+{ PSF(viewAngLerpFrac), 0 },
+{ PSF(weapPosLerpFrac), 0 },
+{ PSF(viewPosLerpFrac), 0 },
+{ PSF(gapLerp), 0 },
+{ PSF(loopSound), 16 },
+{ PSF(hand), 8 }
 };
-	int			g_sprintSpeedFwd;
-	int			g_sprintSpeedSide;
-	int			g_sprintSpeedRear;
+
 /*
 =============
 MSG_WriteDeltaPlayerstate

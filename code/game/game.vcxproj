@@ -187,9 +187,9 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <ModuleDefinitionFile>.\game.def</ModuleDefinitionFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <ProgramDatabaseFile>C:\Quake3\WWC\qagamex86.pdb</ProgramDatabaseFile>
-      <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>C:\Quake3\WWC\qagamex86.map</MapFileName>
+      <ProgramDatabaseFile>C:\Quake3\WWC\Debug\qagamex86.pdb</ProgramDatabaseFile>
+      <GenerateMapFile>false</GenerateMapFile>
+      <MapFileName>C:\Quake3\WWC\Debug\qagamex86.map</MapFileName>
       <SubSystem>Windows</SubSystem>
       <BaseAddress>0x20000000</BaseAddress>
       <ImportLibrary>.\Debug/qagamex86.lib</ImportLibrary>

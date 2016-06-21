@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // bg_pmove.c -- both games player movement code
 // takes a playerstate and a usercmd as input and returns a modifed playerstate
 
+#include "bg_promode.h"
 #include "q_shared.h"
 #include "bg_public.h"
 #include "bg_local.h"
@@ -45,15 +46,27 @@ float	pm_waterfriction = 1.0f;
 float	pm_flightfriction = 3.0f;
 float	pm_spectatorfriction = 5.0f;
 
-float	pm_sprintSpeedForward;
+float	pm_sprintSpeedForward; //zcm
 float	pm_sprintSpeedSide;
 float	pm_sprintSpeedBack;
 
-int		c_pmove = 0;
+//the endgoal is to create a curved 3D space rather than a boxthat represents the bounds of where you can place your onscreen itemw/weappon
+vec3_t	maxWeapPos = { -5, 12, -12};
+vec3_t	minWeapPos = { 1, -12, -20};
 
+vec3_t	tempSightsOffset = { 7.5, -.2, -6};
+vec3_t	baseWeapOffset = { -3, 0, -12};
+vec3_t	sprintWeapAngle = { 20, 60, 20};
+vec3_t	sprintRocketJumpAngle = { 90, 0, 0};//should point directly under player origin
+vec3_t	sprintWeapOffset = { 10, 10, -12};
+
+
+vec3_t		weapOffsBlend, weapAngBlend, viewAngBlend = {0, 0, 0};
 
 vec3_t traceBody[8]; //zcm
+int			hand; 
 
+int		c_pmove = 0;
 
 /*
 ===============
@@ -244,7 +257,7 @@ Handles user intended acceleration
 ==============
 */
 static void PM_Accelerate( vec3_t wishdir, float wishspeed, float accel ) {
-#if 1
+//#if 1
 	// q2 style
 	int			i;
 	float		addspeed, accelspeed, currentspeed;
@@ -255,6 +268,7 @@ static void PM_Accelerate( vec3_t wishdir, float wishspeed, float accel ) {
 		return;
 	}
 	accelspeed = accel*pml.frametime*wishspeed;
+
 	if (accelspeed > addspeed) {
 		accelspeed = addspeed;
 	}
@@ -263,24 +277,24 @@ static void PM_Accelerate( vec3_t wishdir, float wishspeed, float accel ) {
 		pm->ps->velocity[i] += accelspeed*wishdir[i];	
 	}
 
-#else
-	// proper way (avoids strafe jump maxspeed bug), but feels bad
-	vec3_t		wishVelocity;
-	vec3_t		pushDir;
-	float		pushLen;
-	float		canPush;
-
-	VectorScale( wishdir, wishspeed, wishVelocity );
-	VectorSubtract( wishVelocity, pm->ps->velocity, pushDir );
-	pushLen = VectorNormalize( pushDir );
-
-	canPush = accel*pml.frametime*wishspeed;
-	if (canPush > pushLen) {
-		canPush = pushLen;
-	}
-
-	VectorMA( pm->ps->velocity, canPush, pushDir, pm->ps->velocity );
-#endif
+//#else
+//	// proper way (avoids strafe jump maxspeed bug), but feels bad
+//	vec3_t		wishVelocity;
+//	vec3_t		pushDir;
+//	float		pushLen;
+//	float		canPush;
+//
+//	VectorScale( wishdir, wishspeed, wishVelocity );
+//	VectorSubtract( wishVelocity, pm->ps->velocity, pushDir );
+//	pushLen = VectorNormalize( pushDir );
+//
+//	canPush = accel*pml.frametime*wishspeed;
+//	if (canPush > pushLen) {
+//		canPush = pushLen;
+//	}
+//
+//	VectorMA( pm->ps->velocity, canPush, pushDir, pm->ps->velocity );
+//#endif
 }
 
 
@@ -309,9 +323,9 @@ static float PM_CmdScale( usercmd_t *cmd ) {
 	if ( !max ) {
 		return 0;
 	}
-	
-	total = sqrt( cmd->forwardmove * cmd->forwardmove
-		+ cmd->rightmove * cmd->rightmove + cmd->upmove * cmd->upmove );
+
+	total = sqrt( cmd->forwardmove * cmd->forwardmove + cmd->rightmove * cmd->rightmove + cmd->upmove * cmd->upmove );
+
 	scale = (float)pm->ps->speed * max / ( 127.0 * total );
 
 	return scale;
@@ -401,12 +415,16 @@ static void PM_SprintMove( void ){
 
 		if(i>3)			dir3 = 1;
 		else			dir3 = -1;
+		
 
 		VectorClear(pm->body.points[i]);
+
+		//Com_Printf( "%f  %f  %f\n", pm->body.points[i][0], pm->body.points[i][1], pm->body.points[i][2]);
 
 		VectorMA( pm->body.points[i], dir * BOX_GIRTH,		forward,	pm->body.points[i]);
 		VectorMA( pm->body.points[i], dir2 * BOX_GIRTH,		right,		pm->body.points[i]);
 		VectorMA( pm->body.points[i], dir3 * BOX_HEIGHT,	up,			pm->body.points[i]);
+		//Com_Printf( "%f  %f  %f\n", pm->body.points[i][0], pm->body.points[i][1], pm->body.points[i][2]);
 	}
 }
  
@@ -428,11 +446,14 @@ static qboolean PM_CheckJump( void ) {
 	}
 
 	// must wait for jump to be released
-	if ( pm->ps->pm_flags & PMF_JUMP_HELD ) {
-		// clear upmove so cmdscale doesn't lower running speed
-		pm->cmd.upmove = 0;
-		return qfalse;
-	}
+
+
+	//zcm automatic run
+	//if ( pm->ps->pm_flags & PMF_JUMP_HELD ) {
+	//	// clear upmove so cmdscale doesn't lower running speed
+	//	pm->cmd.upmove = 0;
+	//	return qfalse;
+	//}
 
 	pml.groundPlane = qfalse;		// jumping away
 	pml.walking = qfalse;
@@ -451,10 +472,19 @@ static qboolean PM_CheckJump( void ) {
 		pm->ps->velocity[2] = JUMP_VELOCITY + leapMult * MAX_LEAP_VELOCITY;
 		PM_AddEvent( EV_JUMP );
 	} else {
-		pm->ps->velocity[2] = RUN_HEIGHT;
+		pm->ps->velocity[2] = JUMP_VELOCITY;
+		//pm->ps->velocity[2] = RUN_HEIGHT;
 	}
 
+// CPM: check for double-jump
+	if (cpm_pm_jump_z) {
+		if (pm->ps->stats[STAT_JUMPTIME] > 0) {
+			pm->ps->velocity[2] += cpm_pm_jump_z;
+		}
 
+		pm->ps->stats[STAT_JUMPTIME] = 400;
+	}
+// !CPM
 
 	if ( pm->cmd.forwardmove >= 0 ) {
 		PM_ForceLegsAnim( LEGS_JUMP );
@@ -681,6 +711,8 @@ static void PM_AirMove( void ) {
 	float		wishspeed;
 	float		scale;
 	usercmd_t	cmd;
+	float		accel; // CPM
+	float		wishspeed2; // CPM
 
 	PM_Friction();
 
@@ -709,8 +741,28 @@ static void PM_AirMove( void ) {
 	wishspeed = VectorNormalize(wishdir);
 	wishspeed *= scale;
 
+	// CPM: Air Control
+	wishspeed2 = wishspeed;
+	if (DotProduct(pm->ps->velocity, wishdir) < 0)
+		accel = cpm_pm_airstopaccelerate;
+	else
+		accel = pm_airaccelerate;
+	if (pm->ps->movementDir == 2 || pm->ps->movementDir == 6)
+	{
+		if (wishspeed > cpm_pm_wishspeed)
+			wishspeed = cpm_pm_wishspeed;	
+		accel = cpm_pm_strafeaccelerate;
+	}
+	// !CPM
+
 	// not on ground, so little effect on velocity
-	PM_Accelerate (wishdir, wishspeed, pm_airaccelerate);
+
+	// CPM: Air control
+	PM_Accelerate (wishdir, wishspeed, accel);
+	if (cpm_pm_aircontrol)
+		CPM_PM_Aircontrol (pm, wishdir, wishspeed2);
+	// !CPM
+
 
 	// we may have a ground plane that is very steep, even
 	// though we don't have a groundentity
@@ -798,6 +850,17 @@ static void PM_WalkMove( void ) {
 	fmove = pm->cmd.forwardmove;
 	smove = pm->cmd.rightmove;
 
+	if(pm->ps->pm_flags & PMF_SPRINT){ 
+		fmove *= 1.6;
+		smove *= 1.25;
+	} else if (pm->ps->pm_weapFlags & PWF_WEAPONUP){
+		fmove *= .6;
+		smove *= .4;		 
+	} /* else if (ps->pm_weapFlags & PMF_SPRINT) && (ps->pm_weapFlags & PWF_WEAPONUP){//should be a position here for running and having sights. not near same speed as sprinting, but a real stamina eater.
+	}*/ else {	  
+
+	}
+
 	cmd = pm->cmd;
 	scale = PM_CmdScale( &cmd );
 
@@ -818,12 +881,17 @@ static void PM_WalkMove( void ) {
 	for ( i = 0 ; i < 3 ; i++ ) {
 		wishvel[i] = pml.forward[i]*fmove + pml.right[i]*smove;
 	}
+
 	// when going up or down slopes the wish velocity should Not be zero
 //	wishvel[2] = 0;
 
 	VectorCopy (wishvel, wishdir);
 	wishspeed = VectorNormalize(wishdir);
 	wishspeed *= scale;
+
+	
+
+	//Com_Printf("%f \n", sqrt( pm->ps->velocity[0] * pm->ps->velocity[0] + pm->ps->velocity[1] * pm->ps->velocity[1] ));
 
 	// clamp the speed lower if ducking
 	if ( pm->ps->pm_flags & PMF_DUCKED ) {
@@ -863,8 +931,8 @@ static void PM_WalkMove( void ) {
 //		pm->ps->velocity[2] = 0;
 	}
 
-	vel = VectorLength(pm->ps->velocity);
-
+	vel = VectorLength(pm->ps->velocity); 
+	
 	// slide along the ground plane
 	PM_ClipVelocity (pm->ps->velocity, pml.groundTrace.plane.normal, 
 		pm->ps->velocity, OVERCLIP );
@@ -1004,6 +1072,7 @@ static void PM_CrashLand( void ) {
 	float		vel, acc;
 	float		t;
 	float		a, b, c, den;
+	vec3_t		weapOffsBlend  = {0, 0, 0};
 
 	// decide which landing animation to use
 	if ( pm->ps->pm_flags & PMF_BACKWARDS_JUMP ) {
@@ -1017,7 +1086,7 @@ static void PM_CrashLand( void ) {
 	// calculate the exact velocity on landing
 	dist = pm->ps->origin[2] - pml.previous_origin[2];
 	vel = pml.previous_velocity[2];
-	acc = -pm->ps->gravity;
+	acc = -pm->ps->gravity; 
 
 	a = acc / 2;
 	b = vel;
@@ -1034,7 +1103,7 @@ static void PM_CrashLand( void ) {
 
 	// ducking while falling doubles damage
 	if ( pm->ps->pm_flags & PMF_DUCKED ) {
-		delta *= 2;
+		//delta *= 2;
 	}
 
 	// never take falling damage if completely underwater
@@ -1075,6 +1144,7 @@ static void PM_CrashLand( void ) {
 
 	// start footstep cycle over
 	pm->ps->bobCycle = 0;
+
 }
 
 /*
@@ -1118,6 +1188,8 @@ static int PM_CorrectAllSolid( trace_t *trace ) {
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
 	pml.groundPlane = qfalse;
 	pml.walking = qfalse;
+
+
 
 	return qfalse;
 }
@@ -1849,7 +1921,7 @@ static void PM_DropTimers( void ) {
 
 	if ( pm->ps->torsoTimer > 0 ) {
 		pm->ps->torsoTimer -= pml.msec;
-		if ( pm->ps->torsoTimer < 0 ) {
+		if ( pm->ps->torsoTimer < 0 ){ 
 			pm->ps->torsoTimer = 0;
 		}
 	}
@@ -1859,10 +1931,44 @@ static void PM_DropTimers( void ) {
 //put this in qshared with lerpangle to get it to work
 float LerpPosition (float from, float to, float frac) {
 	float	a;
-	a = from + frac * (to - from);
+	a = from + (frac) * (to - from);
 	return a;
 }
- 
+
+float LerpPositionSq (float from, float to, float frac) {
+	float	a;
+	a = from + (frac * frac * frac) * (to - from);
+	return a;
+}
+//
+//int checkHand(){
+//
+//}
+
+
+signed short WrapShort( int i ) {
+	if ( i < -32768 ) {
+		i += 65535;
+	}
+
+	if ( i > 32767 ) {
+		i -= 65535;
+	}
+
+	return i;
+}
+
+int FlipShort( int i ) {
+	//this flips the angles
+	i += 32767;
+	if(i > 32767){
+		i -= 65534;
+	} 
+
+	return i;
+			
+}
+
 /*
 ================
 PM_UpdateViewAngles
@@ -1872,172 +1978,315 @@ are being updated isntead of a full move
 ================
 */
 
+
 void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
-	short		temp[2];
+	int			parent;		//angles that contact the bounds and drag the child
+	short		child;		//angles that form the bounds, but follow the parent
+	short		shortGap;
+	float		viewMult;
+	int			transferView;
+	int			flipped;
+	float		armLength;
 	int			i;
-	float		freeAimDist;
-	vec3_t		maxPos;
-	vec3_t		minPos;
-	vec3_t		tempSightsOffset;
-	vec3_t		baseWeapOffset;
-	vec3_t		sprintWeapAngle;
-	vec3_t		sprintRocketJumpAngle;
-	vec3_t		sprintWeapOffset;
-	
+	float		pitchBoundMult = .75;
+	 
+	float		forwardMult = ps->viewangles[0]/90; 
+	float		upMult = (90 - fabs(ps->viewangles[0]))/90;
+
+	int			shortTotal = 65535;
+	int			gapMult = 1;
+	vec3_t		vMat[3];
+	float			zoomBoundMult;
+
+	armLength = 10;
 
 	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPINTERMISSION)  return;		// no view changes at all
 	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 )	return;  
 	
-	pm->maxGapDist = 90;
+////all the things that would be done regardless of modification should go here to be overwritten, defaults, etc
+	VectorCopy( baseWeapOffset, weapOffsBlend);
+	VectorCopy( ps->viewangles, viewAngBlend);
 
-	if(ps->pm_weapFlags & PMF_WEAPONUP){
-		//pm->maxGapDist = 0;
-		//pm->maxGapDist = 0;
-		//freeAimDist = 0;
-	} else {
-		//freeAimDist = pm->maxGapDist/6;
+	if(!((ps->pm_weapFlags & PWF_WEAPONRIGHT) && (ps->pm_weapFlags & PWF_WEAPONLEFT))){
+		hand = 0;
+
+		if(ps->pm_weapFlags & PWF_WEAPONRIGHT){
+			weapOffsBlend[1] = maxWeapPos[1] ;
+			hand = 1;
+		}
+	
+		if (ps->pm_weapFlags & PWF_WEAPONLEFT){
+			weapOffsBlend[1] = minWeapPos[1] ;
+			hand = -1;
+		}
 	}
+	
+//what happens first? get cmd angles determine where they go? The view? Or weapon?
+//Modify deadzone based on which angle is being followed
+//Give angle and position offsets to movement type
+//Apply offsets 
 
-	//sprint
-	sprintWeapOffset[0] = 10;
-	sprintWeapOffset[1] = 30;
-	sprintWeapOffset[2] = -12;
+	if((ps->pm_flags & PMF_RESPAWNED)){			//the whole else block should be put in a function for later use with vehicles for instance
+		VectorCopy(viewAngBlend, weapAngBlend);		//weapon should really start off pointing towards the center and downwards
+	} else { 
+		for (i=0 ; i<2 ; i++) {
 
-	//sprint rj angle for when looking up and sprinting
-	sprintRocketJumpAngle[0]; //should point directly under player origin
-	sprintRocketJumpAngle[1]; 
-	sprintRocketJumpAngle[2];
-
-	//sprint
-	sprintWeapAngle[0] = 20;
-	sprintWeapAngle[1] = 60;
-	sprintWeapAngle[2] = 20;
-
-	//sights
-	tempSightsOffset[0] = 7.5;
-	tempSightsOffset[1] = -.2;
-	tempSightsOffset[2] = -6;
-
-	//hip
-	baseWeapOffset[0] = -3;
-	baseWeapOffset[1] = 0;
-	baseWeapOffset[2] = -12;
-
-	//the endgoal is to create a curved 3D space rather than a boxthat represents the bounds of where you can place your onscreen itemw/weappon
-	minPos[0] = 1;	//maximum forward and back.
-	maxPos[0] = -5;
-
-	minPos[1] = -12; //maximum left or right on screen
-	maxPos[1] = 12;
-
-	minPos[2] = -20; //maximum up or down on screen
-	maxPos[2] = -12; 
-
-//weapon rotation
-	for (i=0 ; i<2 ; i++) {		
-		temp[i] = cmd->angles[i] + ps->delta_angles[i];
-
-		if(((ps->pm_flags & PMF_RESPAWNED) || (ps->pm_flags & PMF_SPRINT)) && (pm->ps->pm_type != PM_DEAD)){
-			ps->viewangles[i] = SHORT2ANGLE(temp[i]);//have the viewangles follow the view for the first frame after respawning
-			ps->weaponAngles[i] = ps->viewangles[i];
-			
-
-			ps->pm_weapFlags &= ~PMF_WEAPONUP;
-			ps->zoomed = 0;
-		} else {
-			ps->weaponAngles[i] =  SHORT2ANGLE(temp[i]);
-			pm->weapViewGap[i] = ps->weaponAngles[i] - ps->viewangles[i];
-			pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i]))));
-
-			if(pm->maxGapDist != 0){
-				pm->viewMult[i] = pm->weapViewGap[i]/pm->maxGapDist;
+			zoomBoundMult = 1;
+			if(ps->pm_flags & PMF_SPRINT){ // I'm not satisfied with this. view ang should not snap to input angles	
+				ps->gapLerp = LerpPositionSq( ps->gapLerp, 30, .25);	
+				viewMult = .5;
+			} else if (ps->pm_weapFlags & PWF_WEAPONUP) {
+				ps->gapLerp = LerpPositionSq( ps->gapLerp, 10, .35);
+				zoomBoundMult = .25;
+				viewMult = .8;//you should be able to edit that value b`etween -i and .75	
 			} else {
-				pm->viewMult[i] = .9;
+				//ps->gapLerp = LerpPositionSq( ps->gapLerp, 40, .25); 
+				ps->gapLerp = LerpPositionSq( ps->gapLerp, 20, .25); 
+				viewMult = .5;
 			}
 
+			parent = cmd->angles[i];
+			parent = WrapShort(parent);
+			transferView = parent;
+			transferView = FlipShort(transferView);
 
-			pm->viewMult[i] = fabs(pm->viewMult[i]);
-			if (pm->viewMult[i] > 1 ) pm->viewMult[i] = 1;
-		}
-	} 
-	
-	//dist represents the gap between the weapon and the edge of the view frustrum if fov is 90, dist will be 45 if weapon is halfway off edge of screen
-	pm->dist = sqrt(fabs((pm->weapViewGap[0] * pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1])));
+			child = ANGLE2SHORT(ps->viewangles[i]);
 
-	if(ps->pm_flags & PMF_SPRINT){
-		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], sprintWeapOffset[0], .05);
-		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], sprintWeapOffset[1], .05);
-		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], sprintWeapOffset[2], .05);
+			shortGap = ANGLE2SHORT(ps->gapLerp );
 
-		ps->weapLerpFrac = LerpPosition( ps->weapLerpFrac, 1, .05); //since I haven't figured out how to use learpAngleRight yet
+			flipped = 0;
+			//check which half of the world weapon is pointing towards
+			if( (parent > (shortTotal / 4)) || (parent < -(shortTotal / 4))){ 
+				parent = FlipShort(parent);
+				child = FlipShort(child);
+				ps->oldAngles[i] = FlipShort(ps->oldAngles[i] );
+				flipped = 1;
+			} 
+					
 
-		//ps->weaponAngles[0] += fabs(ps->viewangles[0])/* * fabs(ps->viewangles[0])/90*/;
-		//ps->weaponAngles[1] += ps->viewangles[1];
-		//ps->weaponAngles[2] += ps->viewangles[2];
+			//the gap is lower if you're looking up.
+			if(i == PITCH){
+				gapMult = .5;
+			}  else {
+				gapMult = 1;
+			}
+
+			ps->dirOverflow[i] = 1;
+			
+			//diroverflow does not need to be in playerstate if it's taking info from oldangles
+			//calculate freeaim and weapon articulation
+			if ( child < parent - shortGap){ //turning left, turning down
+				child = parent - shortGap;
+				if(parent - ps->oldAngles[i]){ 
+					ps->dirOverflow[i] = .005 * (parent - ps->oldAngles[i]);
+
+					if(ps->dirOverflow[i] > armLength)
+						ps->dirOverflow[i] = armLength;
+
+					if(ps->dirOverflow[i] < -armLength)
+						ps->dirOverflow[i] = -armLength;
  
-		//VectorAdd(ps->viewangles, ps->weaponAngles, ps->weaponAngles);
-	} else {
-		if( ps->weapLerpFrac != 0){
-			ps->weapLerpFrac = LerpPosition( ps->weapLerpFrac, 0, .05);
-		} 
+					if(i == YAW){
+						weapOffsBlend[1] += LerpPositionSq( weapOffsBlend[1], ps->dirOverflow[1], 1);
+						if(hand){
+							weapOffsBlend[0] +=  upMult * -hand * .25 * zoomBoundMult * LerpPositionSq( weapOffsBlend[0], ps->dirOverflow[YAW], 1);
+							weapOffsBlend[2] +=  forwardMult * -hand * .1 * zoomBoundMult * LerpPositionSq( weapOffsBlend[2], ps->dirOverflow[YAW], 1);
+						}
+					}
+
+					if(i == PITCH){
+						weapOffsBlend[0] += forwardMult * pitchBoundMult * zoomBoundMult * LerpPositionSq( weapOffsBlend[0], ps->dirOverflow[PITCH], 1);
+						weapOffsBlend[2] += upMult * pitchBoundMult * zoomBoundMult * LerpPositionSq( weapOffsBlend[2], ps->dirOverflow[PITCH], 1);
+					}
+
+				}
+			} else if ( child > parent +  gapMult * shortGap) { //turning right, turning up
+				child = parent + gapMult * shortGap;
+
+				if(parent - ps->oldAngles[i]){ 
+					ps->dirOverflow[i] = .005 * (parent - ps->oldAngles[i]);
+
+					if(ps->dirOverflow[i] > armLength)
+						ps->dirOverflow[i] = armLength;
+
+					if(ps->dirOverflow[i] < -armLength)
+						ps->dirOverflow[i] = -armLength;
+ 
+					if(i == YAW){
+						weapOffsBlend[1] += LerpPositionSq( weapOffsBlend[1], ps->dirOverflow[1], 1);
+						if(hand){
+							weapOffsBlend[0] +=  -hand * upMult * .25 * zoomBoundMult * LerpPositionSq( weapOffsBlend[0], ps->dirOverflow[YAW], 1);
+							weapOffsBlend[2] +=  -hand * forwardMult * .1 * zoomBoundMult * LerpPositionSq( weapOffsBlend[2], ps->dirOverflow[YAW], 1);
+						}
+					}
+ 
+					if(i == PITCH){
+						weapOffsBlend[0] += -forwardMult * pitchBoundMult * zoomBoundMult * LerpPositionSq( weapOffsBlend[0], ps->dirOverflow[PITCH], 1);
+						weapOffsBlend[2] += -upMult * pitchBoundMult * zoomBoundMult * LerpPositionSq( weapOffsBlend[2], ps->dirOverflow[PITCH], 1);
+					}
+
+				}
+			} else {
+				//move the viewangles a bit while the weapon moves  
+				child += (parent - ps->oldAngles[i]) * viewMult;
+
+				//keep weapon from blocking camera by moving it down before it gets to the bounds
+				//if( i == PITCH){
+				//	if( child > parent +  .5 * shortGap){
+				//		weapOffsBlend[0] += -forwardMult * 5 * pitchBoundMult * LerpPositionSq( weapOffsBlend[0], ps->dirOverflow[PITCH], 1);
+				//		weapOffsBlend[2] += -upMult *  5 * pitchBoundMult * LerpPositionSq( weapOffsBlend[2], ps->dirOverflow[PITCH], 1);
+				//	}
+				//}
+			}  
+
+			//reorient angles if screen was flipped
+			if( flipped ){
+				parent = FlipShort(parent);
+				child = FlipShort(child);
+			} 
+
+			ps->oldAngles[i] = parent; //store oldangles to calculate turn velocity and ramp gun position
+
+			weapAngBlend[i] = SHORT2ANGLE( parent );
+			viewAngBlend[i] = SHORT2ANGLE( child );
+
+			pm->weapViewGap[i] = weapAngBlend[i] - viewAngBlend[i];
+			pm->weapViewGap[i] = RAD2DEG(asin(sin(DEG2RAD(pm->weapViewGap[i])))); 
+		}
 	}
 
-	ps->weaponAngles[0] = LerpAngle( ps->weaponAngles[0], sprintWeapAngle[0], ps->weapLerpFrac);
-	ps->weaponAngles[1] = LerpAngle( ps->weaponAngles[1], sprintWeapAngle[1] + ps->viewangles[1], ps->weapLerpFrac);
-	ps->weaponAngles[2] = LerpAngle( ps->weaponAngles[2], sprintWeapAngle[2] + ps->viewangles[2], ps->weapLerpFrac);
+	pm->dist = sqrt(fabs((pm->weapViewGap[0] * pm->weapViewGap[0]) + (pm->weapViewGap[1] *  pm->weapViewGap[1])));
 
-	if (ps->pm_weapFlags & PMF_WEAPONUP){
-		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], tempSightsOffset[0], .05);
-		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], tempSightsOffset[1], .05);
-		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], tempSightsOffset[2], .05);
+	//change lerp values if not on the ground
 
+
+	//should probably move this to crashland, or add a previous velocity value to the playerstate
+
+	//sprinting
+	if(ps->pm_flags & PMF_SPRINT){ 
+
+		//lower weapon to appropriate position
+		//if(hand == 0){
+		//	weapAngBlend[0] = 3 * sprintWeapAngle[0]; 
+		//} else {
+		//	weapAngBlend[0] = sprintWeapAngle[0]; 
+		//}
+		//weapAngBlend[1] = ( hand * sprintWeapAngle[1]) + viewAngBlend[1];
+
+		////move directions should influence weapon angles, too, so you can sprint but aim in a wobbly i handed way
+		//ps->weapAngLerpFrac = LerpPositionSq( ps->weapAngLerpFrac, .075, 1); //lerpfrac's lerp in/out needs to change depending on the gap between position and sprint position
+
+		//if(pm->dist >= ps->gapLerp/2 && pm->dist < ps->gapLerp){
+		//	ps->viewAngLerpFrac = LerpPositionSq( ps->viewAngLerpFrac, .8, 1);
+		//} else {
+		//	ps->viewAngLerpFrac = LerpPositionSq( ps->viewAngLerpFrac, .5, 1); 
+		//}
+		ps->weapPosLerpFrac = LerpPosition( ps->weapPosLerpFrac, .025, 1);
+		
+		ps->pm_weapFlags &= ~PWF_WEAPONUP;
+		ps->zoomed = 0;
+	} else if (ps->pm_weapFlags & PWF_WEAPONUP){
+		////zooming with sights
+		ps->weapAngLerpFrac = LerpPositionSq( ps->weapAngLerpFrac, 1, .25);
+
+		if(pm->dist >= ps->gapLerp/2){
+			ps->viewAngLerpFrac = LerpPositionSq( ps->viewAngLerpFrac, .5, .4);
+		} else {
+			ps->viewAngLerpFrac = LerpPositionSq( ps->viewAngLerpFrac, .1, .5); 
+		}
+
+		////ps->weapPosLerpFrac = LerpPositionSq( ps->weapPosLerpFrac, .25, 1);
+		ps->weapPosLerpFrac = LerpPosition( ps->weapPosLerpFrac, .25, .25);
+ 
 		ps->zoomed = 1;
-	} else {
-		ps->weaponOffset[0] = LerpPosition( ps->weaponOffset[0], baseWeapOffset[0], .05);
-		ps->weaponOffset[1] = LerpPosition( ps->weaponOffset[1], baseWeapOffset[1], .05);
-		ps->weaponOffset[2] = LerpPosition( ps->weaponOffset[2], baseWeapOffset[2], .05);
+
+	} /* else if (ps->pm_weapFlags & PMF_SPRINT) && (ps->pm_weapFlags & PWF_WEAPONUP){//should be a position here for running and having sights. not near same speed as sprinting, but a real stamina eater.
+	}*/ else {	
+		ps->weapAngLerpFrac = LerpPositionSq( ps->weapAngLerpFrac, 1, .25);
+		ps->viewAngLerpFrac = LerpPositionSq( ps->viewAngLerpFrac, 1, .25);
+		ps->weapPosLerpFrac = LerpPosition( ps->weapPosLerpFrac, .1, 1);
+ 
 		ps->zoomed = 0;
 	}
 
-	//this kind of makes a triangle between the weapon and the gun once its gets past freeaim distance, then snaps it back
-	//should have taken a hint from playerAngles in cg_players and LerpAngle in qmath the 3rd person model does this when rotating
-	for (i=0 ; i<2 ; i++) {
-		if(ps->pm_weapFlags & PMF_WEAPONUP){
-			pm->deadZone = (3 * pm->viewMult[i] ) * pm->weapViewGap[i]; //this is not perfect. needs to move smoother. the else if and difference in algorithms makes a weird jerk when unzoomed
-			ps->viewangles[i] = ps->viewangles[i] + pm->deadZone;
-		} else 	if (pm->dist > freeAimDist) {
-			//Com_Printf("dist: %f \n", pm->dist );
-			pm->deadZone = pm->viewMult[i] * pm->viewMult[i] *pm->weapViewGap[i];
-			ps->viewangles[i] = ps->viewangles[i] + pm->deadZone;
+ 	if ( ps->groundEntityNum == ENTITYNUM_NONE ) {
+		ps->weapPosLerpFrac = LerpPositionSq( ps->weapPosLerpFrac, .025, 1);
+		if(ps->velocity[2] > 150 && (ps->pm_weapFlags & PWF_WEAPONUP)){
+			ps->pm_weapFlags &= ~PWF_WEAPONUP;
 		}
-	}
+		ps->zoomed = 0;
+	}  
 
-//weapon translation
-	//projectile is offset from the front of the screen, change it
 
-	if (ps->pm_weapFlags & PMF_WEAPONLEFT)	ps->weaponOffset[1] -= .1; 
-	if (ps->pm_weapFlags & PMF_WEAPONRIGHT) ps->weaponOffset[1] += .1;  /*ps->weaponOffset[0] += .1;  ps->weaponOffset[1] += .1; */
-
-	if((ps->pm_weapFlags & PMF_WEAPONLEFT) && (ps->pm_weapFlags & PMF_WEAPONRIGHT)){
-		ps->pm_weapFlags &= ~PMF_WEAPONLEFT;
-		ps->pm_weapFlags &= ~PMF_WEAPONRIGHT;
+////weapon translation
+//	projectile is offset from the front of the screen, change it
+	if((ps->pm_weapFlags & PWF_WEAPONLEFT) && (ps->pm_weapFlags & PWF_WEAPONRIGHT)){
+		ps->pm_weapFlags &= ~PWF_WEAPONLEFT;
+		ps->pm_weapFlags &= ~PWF_WEAPONRIGHT;
 		if(fabs(ps->weaponOffset[1]) > 0){
 		} else if (fabs(ps->weaponOffset[1]) < 0) {
 		}
 	}
-
-	if(ps->weaponOffset[1] < minPos[1]){
-		ps->pm_weapFlags &= ~PMF_WEAPONLEFT;
-		ps->weaponOffset[1] = minPos[1];
+	 
+	//set all of the caps so that they are interpolated as well
+	if(weapOffsBlend[0] < minWeapPos[0] - armLength){
+		weapOffsBlend[0] = minWeapPos[0] - armLength;
 	}
 
-	if(ps->weaponOffset[1] > maxPos[1]){
-		ps->pm_weapFlags &= ~PMF_WEAPONRIGHT;
-		ps->weaponOffset[1] = maxPos[1];
+	if(weapOffsBlend[0] > maxWeapPos[0] + armLength && !(ps->pm_weapFlags & PWF_WEAPONUP)){
+		weapOffsBlend[0] = maxWeapPos[0] + armLength;
 	}
+
+	if(weapOffsBlend[1] < minWeapPos[1] - armLength){
+		ps->pm_weapFlags &= ~PWF_WEAPONLEFT;
+		weapOffsBlend[1] = minWeapPos[1] - armLength;
+	}
+
+	if(weapOffsBlend[1] > maxWeapPos[1] + armLength){
+		ps->pm_weapFlags &= ~PWF_WEAPONRIGHT;
+		weapOffsBlend[1] = maxWeapPos[1] + armLength;
+	}
+	 
+	if(weapOffsBlend[2] < minWeapPos[2] - armLength){
+		weapOffsBlend[2] = minWeapPos[2] - armLength;
+	}
+
+	if(weapOffsBlend[2] > maxWeapPos[2] + armLength){
+		weapOffsBlend[2] = maxWeapPos[2] + armLength;
+	}
+
+	//modify position offset so you can and decelerate the movement. so it moves until you release when you release it lerps to a certain distance away within the max or min distance.
+	//modify freeaim so that the view movies slightly with the weapon movement
+
+//Apply angle offsets 
+	ps->weaponAngles[0] = LerpAngle( ps->weaponAngles[0], weapAngBlend[0], ps->weapAngLerpFrac);
+	ps->weaponAngles[1] = LerpAngle( ps->weaponAngles[1], weapAngBlend[1], ps->weapAngLerpFrac);
+	ps->weaponAngles[2] = LerpAngle( ps->weaponAngles[2], weapAngBlend[2], ps->weapAngLerpFrac);
+
+	ps->viewangles[0] = LerpAngle( ps->viewangles[0], viewAngBlend[0], ps->viewAngLerpFrac);
+	ps->viewangles[1] = LerpAngle( ps->viewangles[1], viewAngBlend[1], ps->viewAngLerpFrac);
+	ps->viewangles[2] = LerpAngle( ps->viewangles[2], viewAngBlend[2], ps->viewAngLerpFrac);
+
+	for(i = 0; i < 3; i++){		
+		if(ps->viewangles[i] >= 360){
+			ps->viewangles[i] -= 360;
+		}
+		if(ps->viewangles[i] <= -360){
+			ps->viewangles[i] += 360;
+		}
+		if(ps->weaponAngles[i] >= 360){
+			ps->weaponAngles[i] -= 360;
+		}
+		if(ps->weaponAngles[i] <= -360){
+			ps->weaponAngles[i] += 360;
+		}
+	}
+
 	ps->weaponAngles[2] = 0;
-
+	ps->viewangles[2] = 0;
 }
+ 
+
 
 static void PM_ArticulateWeapon(vec3_t angles) {
 	float	scale;
@@ -2109,6 +2358,101 @@ static void PM_ArticulateWeapon(vec3_t angles) {
 		angles[YAW] += SWAY_YAW_AMPLITUDE * sin( phase ) * ( spreadfrac + SWAY_YAW_MIN_AMPLITUDE );
 	//}
 	//Com_Printf("ang %f %f %f  \n",angles[0],angles[1],angles[2]); //ZCM track accuracy between game/cgame modules
+}
+
+void PM_ImpactViewItem(){
+	int			i;
+	float		armRigidity;
+	float		armLength = 10;
+	float		impactMult;
+	vec3_t		impactDir;
+
+	float		upMult =   (pm->ps->viewangles[0]/90);
+	float		forwardMult = (90 - fabs(pm->ps->viewangles[0]))/90;
+	vec3_t		offset;
+	vec3_t forward, right, up;
+
+	armLength = 10;
+
+	AngleVectors(pm->ps->weaponAngles, forward, right, up);
+
+	if(pm->ps->pm_flags & PMF_TIME_LAND && pm->ps->groundEntityNum != ENTITYNUM_NONE){
+		impactMult =  -pml.previous_velocity[2];
+	} else {
+		impactMult =  pml.previous_velocity[2]/900;
+		//Com_Printf(" %f\n", impactMult);
+	} 
+
+	//offset position by view
+	//sprinting
+	if(pm->ps->pm_flags & PMF_SPRINT){ 
+		//while sprinting move to this position and ...
+		weapOffsBlend[0] = 7;
+		weapOffsBlend[2] = -5;
+
+	} else if (pm->ps->pm_weapFlags & PWF_WEAPONUP){
+		////zooming with sights
+		weapOffsBlend[0] = tempSightsOffset[0];
+
+		weapOffsBlend[1] = tempSightsOffset[1];
+
+		if(weapOffsBlend[0] > tempSightsOffset[0] + 1){
+			weapOffsBlend[0] = tempSightsOffset[0] + .1;
+		}
+		if(weapOffsBlend[0] < tempSightsOffset[0] - 1){
+			weapOffsBlend[0] = tempSightsOffset[0] - .1;
+		}
+
+
+		weapOffsBlend[2] = tempSightsOffset[2];
+		if(fabs(pm->ps->weaponOffset[2] - tempSightsOffset[2]) < .01){
+			weapOffsBlend[2] = tempSightsOffset[2];
+		}
+
+	} /* else if (ps->pm_weapFlags & PMF_SPRINT) && (ps->pm_weapFlags & PWF_WEAPONUP){//should be a position here for running and having sights. not near same speed as sprinting, but a real stamina eater.
+	}*/ else {	 
+		weapOffsBlend[0] = baseWeapOffset[0] + 12;
+		weapOffsBlend[2] = -7;
+	}
+
+	VectorClear(offset);
+	VectorMA( offset,	weapOffsBlend[0],		forward,	offset);
+	VectorMA( offset,	weapOffsBlend[1],		right,		offset);
+	VectorMA( offset,	weapOffsBlend[2],		up,			offset);
+	VectorCopy(offset, weapOffsBlend);	 
+
+	//offset position by body
+	if(pm->ps->pm_flags & PMF_SPRINT){ 
+		weapOffsBlend[2] = -3;
+		armRigidity = 75;
+	} else if (pm->ps->pm_weapFlags & PWF_WEAPONUP){
+		weapOffsBlend[2] += pm->ps->viewPos[1]/* - 6*/;
+		armRigidity = 400;
+	} /* else if (ps->pm_weapFlags & PMF_SPRINT) && (ps->pm_weapFlags & PWF_WEAPONUP){//should be a position here for running and having sights. not near same speed as sprinting, but a real stamina eater.
+	}*/ else {	 
+		weapOffsBlend[2] += pm->ps->viewPos[1] - 10;
+		armRigidity = 200;
+	}
+
+	impactDir[0] =  -1.5 * pm->ps->velocity[0]/armRigidity;
+	impactDir[1] =  -1.5 * pm->ps->velocity[1]/armRigidity;
+	impactDir[2] =  - 5 * pm->ps->velocity[2]/armRigidity;
+
+	for( i = 0; i < 3; i++){
+		if( impactDir[i] > armLength){
+			impactDir[i] = armLength;
+		} else if (impactDir[i] < -armLength){
+			impactDir[i] = -armLength;
+		}
+	}
+
+	VectorAdd( impactDir, weapOffsBlend, weapOffsBlend );
+
+	//if you set a value, but then do not comment it out, there is no default
+	pm->ps->weaponOffset[0] = LerpPosition( pm->ps->weaponOffset[0], weapOffsBlend[0], pm->ps->weapPosLerpFrac);
+	pm->ps->weaponOffset[1] = LerpPosition( pm->ps->weaponOffset[1], weapOffsBlend[1], pm->ps->weapPosLerpFrac);
+	pm->ps->weaponOffset[2] = LerpPosition( pm->ps->weaponOffset[2], weapOffsBlend[2], pm->ps->weapPosLerpFrac);
+
 }
 
 
@@ -2196,12 +2540,15 @@ void PmoveSingle (pmove_t *pmove) {
 	pml.frametime = pml.msec * 0.001;
 
 	// update the viewangles 
-	PM_UpdateViewAngles( pm->ps, &pm->cmd );
-	if(pm->ps->pm_weapFlags & PMF_SPRINT){
-		AngleVectors (pm->ps->weaponAngles, pml.forward, pml.right, pml.up);	
-	} else {
+
+	if(pm->ps->pm_weapFlags & PMF_SPRINT){ 
 		AngleVectors (pm->ps->viewangles, pml.forward, pml.right, pml.up);	
+	} else { 
+		AngleVectors (pm->ps->weaponAngles, pml.forward, pml.right, pml.up);	
 	}
+
+	PM_UpdateViewAngles( pm->ps, &pm->cmd );
+
 	//NEEDs to be handled differently. idle anim shouldn't play while moving, aiming, or airborne
 	//PM_ArticulateWeapon(pm->ps->weaponAngles);
 
@@ -2266,6 +2613,10 @@ void PmoveSingle (pmove_t *pmove) {
 
 	PM_DropTimers();
 
+// CPM: Double-jump timer
+	if (pm->ps->stats[STAT_JUMPTIME] > 0) pm->ps->stats[STAT_JUMPTIME] -= pml.msec;
+// !CPM
+
 #ifdef MISSIONPACK
 	if ( pm->ps->powerups[PW_INVULNERABILITY] ) {
 		PM_InvulnerabilityMove();
@@ -2295,6 +2646,10 @@ void PmoveSingle (pmove_t *pmove) {
 
 	// set groundentity, watertype, and waterlevel
 	PM_GroundTrace();
+
+	PM_ImpactViewItem();
+
+
 	PM_SetWaterLevel();
 
 	// weapons
@@ -2366,4 +2721,3 @@ void Pmove (pmove_t *pmove) {
 	//PM_CheckStuck();
 
 }
-

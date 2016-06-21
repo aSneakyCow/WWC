@@ -1437,7 +1437,7 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	float		fovOffset;
 	vec3_t		angles;
 	weaponInfo_t	*weapon;
-
+	vec3_t			offset;
 	if ( ps->persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
 		return;
 	}
@@ -1483,23 +1483,22 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 
 	memset (&hand, 0, sizeof(hand));
 
-	// set up gun position
-	//CG_CalculateWeaponPosition( hand.origin, angles );
+	// set up gun position AND angles
+	
+	
+	
+	offset[0] = cg.refdef.vieworg[0];
+	offset[1] = cg.refdef.vieworg[1];
+	offset[2] = cg.refdef.vieworg[2] - cg.predictedPlayerState.viewPos[1];
 
-	VectorCopy( cg.refdef.vieworg, hand.origin );
-	VectorCopy(cg.predictedPlayerState.weaponAngles,angles);
 
-	//Com_Printf("%f %f %f\n",angles[0],angles[1],angles[2]);
-
-	VectorMA( hand.origin, cg.predictedPlayerState.weaponOffset[0], cg.refdef.viewaxis[0], hand.origin );
-	VectorMA( hand.origin, -cg.predictedPlayerState.weaponOffset[1], cg.refdef.viewaxis[1], hand.origin );
-	VectorMA( hand.origin, cg.predictedPlayerState.weaponOffset[2], cg.refdef.viewaxis[2], hand.origin );
+	VectorAdd(offset, cg.predictedPlayerState.weaponOffset,  hand.origin );
+	//VectorCopy( cg.predictedPlayerState.weaponOffset,  hand.origin );
+	VectorCopy(cg.predictedPlayerState.weaponAngles, angles);
 
 	AnglesToAxis( angles, hand.axis );
-	
-	//VectorCopy(angles, cg.refdefWeaponAngles); //ZCM sen this over to game so we can use it to aim
 
-	// map torso animations to weapon animations
+	// map torso animations to weapon animations	
 	if ( cg_gun_frame.integer ) {
 		// development tool
 		hand.frame = hand.oldframe = cg_gun_frame.integer;

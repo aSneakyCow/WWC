@@ -1183,7 +1183,7 @@ typedef struct playerState_s {
 	vec3_t		grapplePoint;	// location of grapple to pull towards if PMF_GRAPPLE_PULL
 
 	vec3_t		weaponAngles;	// zcm
-	vec3_t		weaponOrigin;	// zcm
+	vec3_t		weaponOrigin;	// zcm //don't need this apparently
 	vec3_t		weaponOffset;	// zcm
 	int			zoomed;
 
@@ -1204,7 +1204,10 @@ typedef struct playerState_s {
 	int			weaponstate;
 
 	vec3_t		viewangles;		// for fixed views
+	int			oldAngles[2];	//renametooldangles
+
 	vec2_t		viewPos;
+	vec2_t		dirOverflow;	//check how intensely the weap and view are conflicting
 
 	// damage feedback
 	int			damageEvent;	// when it changes, latch the other parms
@@ -1226,7 +1229,15 @@ typedef struct playerState_s {
 	int			pmove_framecount;	// FIXME: don't transmit over the network
 	int			jumppad_frame;
 	int			entityEventSequence;
-	float		weapLerpFrac; //since I can't figure out how to do the angle lerp the same way as position lerp
+
+	float		weapPosLerpFrac; //since I can't figure out how to do the angle lerp the same way as position lerp
+	float		viewPosLerpFrac; 
+
+	float		weapAngLerpFrac; //since I can't figure out how to do the angle lerp the same way as position lerp
+	float		viewAngLerpFrac; 
+
+	float		gapLerp;
+	int			hand;
 } playerState_t;
 
 

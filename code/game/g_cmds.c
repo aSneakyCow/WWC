@@ -1254,11 +1254,9 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 	} else if ( !Q_stricmp( arg1, "g_doWarmup" ) ) {
 	} else if ( !Q_stricmp( arg1, "timelimit" ) ) {
 	} else if ( !Q_stricmp( arg1, "fraglimit" ) ) {
-	} else if ( !Q_stricmp( arg1, "g_pro_mode" ) ) {
 	} else {
 		trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string.\n\"" );
-		trap_SendServerCommand( ent-g_entities, "print \"Vote commands are: map_restart, nextmap, map <mapname>, g_gametype <n>, kick <player>, clientkick <clientnum>, g_doWarmup, timelimit <time>, fraglimit <frags> and g_pro_mode.\n\"" );
-
+		trap_SendServerCommand( ent-g_entities, "print \"Vote commands are: map_restart, nextmap, map <mapname>, g_gametype <n>, kick <player>, clientkick <clientnum>, g_doWarmup, timelimit <time>, fraglimit <frags>.\n\"" );
 		return;
 	}
 
@@ -1569,6 +1567,31 @@ void Cmd_SetViewpos_f( gentity_t *ent ) {
 	TeleportPlayer( ent, origin, angles );
 }
 
+//void Cmd_GetViewpos_f( gentity_t *ent ) {
+//	vec3_t		origin, angles;
+//	char		buffer[MAX_TOKEN_CHARS];
+//	int			i;
+//
+//	if ( !g_cheats.integer ) {
+//		trap_SendServerCommand( ent-g_entities, va("print \"Cheats are not enabled on this server.\n\""));
+//		return;
+//	}
+//	if ( trap_Argc() != 3 ) {
+//		trap_SendServerCommand( ent-g_entities, va("print \"usage: getviewpos \n\""));
+//		return;
+//	}
+//
+//	VectorClear( angles );
+//	for ( i = 0 ; i < 3 ; i++ ) {
+//		trap_Argv( i + 1, buffer, sizeof( buffer ) );
+//		origin[i] = atof( buffer );
+//	}
+//
+//	trap_Argv( 4, buffer, sizeof( buffer ) );
+//	//angles[YAW] = atof( buffer );
+//
+//	//TeleportPlayer( ent, origin, angles );
+//}
 
 
 /*
@@ -1606,15 +1629,15 @@ void Cmd_Player_Sprint( gentity_t *ent ) {
 }
 
 void Cmd_Player_Zoomin( gentity_t *ent ) {
-	ent->client->ps.pm_weapFlags ^= PMF_WEAPONUP;
+	ent->client->ps.pm_weapFlags ^= PWF_WEAPONUP;
 }
 
 void Cmd_Weapon_Right( gentity_t *ent ) {
-	ent->client->ps.pm_weapFlags ^= PMF_WEAPONRIGHT;
+	ent->client->ps.pm_weapFlags ^= PWF_WEAPONRIGHT;
 }
 
 void Cmd_Weapon_Left( gentity_t *ent ) { //zcm
-	ent->client->ps.pm_weapFlags ^= PMF_WEAPONLEFT;
+	ent->client->ps.pm_weapFlags ^= PWF_WEAPONLEFT;
 }
 
 /*

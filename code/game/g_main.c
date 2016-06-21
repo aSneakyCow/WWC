@@ -21,9 +21,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 //
 
-#include "bg_promode.h" // CPM
 #include "g_local.h"
 
+#include "bg_promode.h" // CPM
+ 
 level_locals_t	level;
 
 typedef struct {
@@ -42,6 +43,7 @@ gclient_t		g_clients[MAX_CLIENTS];
 vmCvar_t	g_gametype;
 
 vmCvar_t	g_pro_mode; // CPM: The overall CPM toggle
+
 vmCvar_t	g_dmflags;
 vmCvar_t	g_fraglimit;
 vmCvar_t	g_timelimit;
@@ -104,6 +106,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_cheats, "sv_cheats", "", 0, 0, qfalse },
 
 	{ &g_pro_mode, "g_pro_mode", "0", CVAR_SERVERINFO, 0, qtrue  }, // CPM: The overall CPM Toggle
+
 	// noset vars
 	{ NULL, "gamename", GAMEVERSION , CVAR_SERVERINFO | CVAR_ROM, 0, qfalse  },
 	{ NULL, "gamedate", __DATE__ , CVAR_ROM, 0, qfalse  },
@@ -348,11 +351,13 @@ void G_RegisterCvars( void ) {
 	for ( i = 0, cv = gameCvarTable ; i < gameCvarTableSize ; i++, cv++ ) {
 		trap_Cvar_Register( cv->vmCvar, cv->cvarName,
 			cv->defaultString, cv->cvarFlags );
-		if ( cv->vmCvar )
+		if ( cv->vmCvar ){
 			cv->modificationCount = cv->vmCvar->modificationCount;
+		}
 
-// CPM: Detect if g_pro_mode has been changed
-		if (!strcmp(cv->cvarName,"g_pro_mode")) {
+		// CPM: Detect if g_pro_mode has been changed
+		if (!strcmp(cv->cvarName,"g_pro_mode"))
+		{
 			// Update all settings
 			CPM_UpdateSettings((g_pro_mode.integer) ?
 				((g_gametype.integer == GT_TEAM) ? 2 : 1) : 0);
@@ -374,7 +379,8 @@ void G_RegisterCvars( void ) {
 				trap_Cvar_Set("g_forcerespawn", "20" );
 				trap_Cvar_Set("g_weaponrespawn", "5" );
 			}
-		} // !CPM
+		}
+		// !CPM
 
 
 		if (cv->teamShader) {
@@ -448,7 +454,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	G_ProcessIPBans();
 
-	G_InitMemory();
+	G_InitMemory(); 
 
 	// CPM: Initialize
 	// Update all settings
@@ -457,7 +463,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	// Set the config string
 	trap_SetConfigstring(CS_PRO_MODE, va("%d", g_pro_mode.integer));
-	// !CPM
+	// !CPM 
 
 	// set some level globals
 	memset( &level, 0, sizeof( level ) );

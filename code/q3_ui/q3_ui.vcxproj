@@ -239,7 +239,7 @@
       <ModuleDefinitionFile>.\ui.def</ModuleDefinitionFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ProgramDatabaseFile>C:\Quake3\WWC\Debug\uix86.pdb</ProgramDatabaseFile>
-      <GenerateMapFile>true</GenerateMapFile>
+      <GenerateMapFile>false</GenerateMapFile>
       <MapFileName>C:\Quake3\WWC\Debug\uix86.map</MapFileName>
       <BaseAddress>0x40000000</BaseAddress>
       <ImportLibrary>Debug/uix86.lib</ImportLibrary>

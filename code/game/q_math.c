@@ -222,6 +222,7 @@ signed char ClampChar( int i ) {
 	return i;
 }
 
+
 signed short ClampShort( int i ) {
 	if ( i < -32768 ) {
 		return -32768;
@@ -598,6 +599,18 @@ float LerpAngle (float from, float to, float frac) {
 
 	return a;
 }
+//
+//signed short WrapShort( int i ) {
+//	if ( i < -32768 ) {
+//		i += 65535;
+//	}
+//
+//	if ( i > 32767 ) {
+//		i -= 65535;
+//	}
+//
+//	return i;
+//}
 
 
 ///* //zcm

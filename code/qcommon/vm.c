@@ -699,7 +699,7 @@ int	QDECL VM_Call( vm_t *vm, int callnum, ... ) {
                             args[8],  args[9], args[10], args[11],
                             args[12], args[13], args[14], args[15]);
 	} else if ( vm->compiled ) {
-		r = VM_CallCompiled( vm, &callnum );
+				r = VM_CallCompiled( vm, &callnum );
 	} else {
 		r = VM_CallInterpreted( vm, &callnum );
 	}

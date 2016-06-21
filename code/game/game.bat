@@ -6,8 +6,6 @@ mkdir vm
 cd vm
 set cc=lcc -DQ3_VM -S -Wf-target=bytecode -Wf-g -I..\..\cgame -I..\..\game -I..\..\ui %1
 
-%cc% ../bg_promode.c
-@if errorlevel 1 goto quit
 %cc%  ../g_main.c
 @if errorlevel 1 goto quit
 
