@@ -544,6 +544,54 @@ static qboolean	PM_CheckWaterJump( void ) {
 	return qtrue;
 }
 
+/*
+=============
+PM_CheckLedgeJump
+=============
+*/
+static qboolean	PM_CheckLedgeJump( void ) {
+	vec3_t	spot;
+	int		cont;
+	vec3_t	flatforward;
+
+	if (pm->ps->pm_time) {
+		return qfalse;
+	}
+
+	// check for water jump
+	if ( pm->waterlevel != 2 ) {
+		return qfalse;
+	}
+
+	flatforward[0] = pml.forward[0];
+	flatforward[1] = pml.forward[1];
+	flatforward[2] = 0;
+	VectorNormalize (flatforward);
+
+	VectorMA (pm->ps->origin, 30, flatforward, spot);
+	spot[2] += 4;
+	cont = pm->pointcontents (spot, pm->ps->clientNum );
+	if ( !(cont & CONTENTS_SOLID) ) {
+		return qfalse;
+	}
+
+	spot[2] += 16;
+	cont = pm->pointcontents (spot, pm->ps->clientNum );
+	if ( cont ) {
+		return qfalse;
+	}
+
+	// jump out of water
+	VectorScale (pml.forward, 200, pm->ps->velocity);
+	pm->ps->velocity[2] = 350;
+
+	pm->ps->pm_flags |= PMF_TIME_WATERJUMP;
+	pm->ps->pm_time = 2000;
+
+	return qtrue;
+}
+
+
 //============================================================================
 
 
@@ -555,6 +603,26 @@ Flying out of the water
 ===================
 */
 static void PM_WaterJumpMove( void ) {
+	// waterjump has no control, but falls
+
+	PM_StepSlideMove( qtrue );
+
+	pm->ps->velocity[2] -= pm->ps->gravity * pml.frametime;
+	if (pm->ps->velocity[2] < 0) {
+		// cancel as soon as we are falling down again
+		pm->ps->pm_flags &= ~PMF_ALL_TIMES;
+		pm->ps->pm_time = 0;
+	}
+}
+
+/*
+===================
+PM_WaterJumpMove
+
+Flying out of the water
+===================
+*/
+static void PM_LedgeJumpMove( void ) {
 	// waterjump has no control, but falls
 
 	PM_StepSlideMove( qtrue );
@@ -713,6 +781,11 @@ static void PM_AirMove( void ) {
 	usercmd_t	cmd;
 	float		accel; // CPM
 	float		wishspeed2; // CPM
+
+	//if(PM_CheckLedgeJump){
+	//	PM_LedgeJumpMove();
+	//	return;
+	//}
 
 	PM_Friction();
 

@@ -28,8 +28,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define	MAX_LEAP_VELOCITY	230 //zcm
 #define	JUMP_VELOCITY	270
-#define	RUN_HEIGHT	170
-//#define	RUN_HEIGHT	270
+//#define	RUN_HEIGHT	170
+#define	RUN_HEIGHT	270
 
 #define	TIMER_LAND		130
 #define	TIMER_GESTURE	(34*66+50)
